@@ -20,15 +20,21 @@ HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assista
 
 ## Supported hardware
 
-The supplied configuration targets an original ESP32 development board using the `esp32dev` board profile. It has been tested with a MINI D1 ESP32 and a 1.3 inch CH1115 128x64 I2C OLED in SH1106 compatibility mode.
+The supplied configuration uses the ESPHome `esp32dev` board profile. It has been tested with the exact parts below.
 
-You need:
+## Bill of materials
 
-- ESP32 board with Bluetooth LE and USB programming
-- CH1115 or SH1106-compatible 128x64 I2C OLED at address `0x3C`
-- Four female-to-female or female-to-male jumper wires, depending on your headers
-- USB data cable and a 5 V USB power source
-- Home Assistant with the ESPHome integration
+| Qty | Part | Exact identification | Size | Supplier code | Purchase link |
+| --- | --- | --- | --- | --- | --- |
+| 1 | AZ-Delivery ESP32 D1 Mini NodeMCU, Micro-USB | ESP-WROOM-32, ESP32-D0WDQ6, CP2104, 4 MB flash, Wi-Fi and Bluetooth 4.2 | 39 x 31.5 mm, 12 g | SKU `A 20-2`, GTIN `4260581559441` | [AZ-Delivery ESP32 D1 Mini](https://www.az-delivery.de/en/products/esp32-d1-mini) |
+| 1 | 1.3 inch white OLED, I2C, 128x64 | Photographed PCB marking `CH1115-128x64DOT`, address `0x3C`; configured as SH1106 in ESPHome | AZ listing: 36 x 34 x 3 mm | AZ equivalent SKU `A 1-6`, GTIN `4260581550073` | [AZ-Delivery 1.3 inch OLED](https://www.az-delivery.de/en/products/1-3zoll-i2c-oled-display) |
+| 4 | Dupont jumper wires | Female-to-female for boards with fitted headers | About 10 to 20 cm | Any suitable set | Local electronics supplier |
+| 1 | USB data cable | Micro-USB data cable for the photographed ESP32; do not use a charge-only cable | Any practical length | Not fixed | Local electronics supplier |
+| 1 | USB power supply | Regulated 5 V USB supply, at least 1 A | Not applicable | Not fixed | Local electronics supplier |
+
+The pictured OLED is a CH1115 batch. AZ-Delivery currently describes its equivalent 1.3 inch product as SH1106, so check the controller or rear PCB marking when ordering. Both are supported by this project through ESPHome's `SH1106 128x64` compatibility mode. Store stock and product revisions can change, and these are direct non-affiliate links.
+
+You also need Home Assistant with the ESPHome integration.
 
 ## Wiring
 

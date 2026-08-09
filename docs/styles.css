@@ -570,12 +570,27 @@ select:focus-visible,
 .wire-blue { top: 59.5%; color: #349ada; }
 .wire-labels { display: none; }
 
+.parts-list {
+  margin-bottom: 46px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(17, 25, 32, 0.56);
+}
+
+.parts-list table,
 .wiring-notes table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
 
+.parts-list table {
+  min-width: 760px;
+}
+
+.parts-list th,
+.parts-list td,
 .wiring-notes th,
 .wiring-notes td {
   padding: 15px 12px;
@@ -583,11 +598,45 @@ select:focus-visible,
   text-align: left;
 }
 
+.parts-list th,
 .wiring-notes th {
   color: var(--muted);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.parts-list td:first-child,
+.parts-list td:nth-child(5) {
+  color: var(--accent);
+  font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.parts-list td:last-child,
+.parts-list th:last-child {
+  text-align: right;
+}
+
+.parts-list a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.parts-list small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.parts-note {
+  margin: 0;
+  padding: 18px 20px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.parts-note code {
+  color: var(--text);
 }
 
 .wiring-notes td:first-child,
