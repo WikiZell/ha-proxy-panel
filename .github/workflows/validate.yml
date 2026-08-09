@@ -15,7 +15,7 @@ jobs:
     container: ghcr.io/esphome/esphome:stable
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Prepare test secrets
         run: cp firmware/secrets.example.yaml firmware/secrets.yaml
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check required website files
         run: |
