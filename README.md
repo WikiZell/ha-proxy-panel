@@ -28,13 +28,12 @@ The supplied configuration uses the ESPHome `esp32dev` board profile. It has bee
 | --- | --- | --- | --- | --- | --- |
 | 1 | AZ-Delivery ESP32 D1 Mini NodeMCU | Current Amazon version has USB-C, ESP-WROOM-32, CP2104, 4 MB flash, Wi-Fi and Bluetooth 4.2 | 39 x 31.5 mm, 12 g | Amazon ASIN `B0DHY5C3Q3` | [Amazon.nl](https://www.amazon.nl/dp/B0DHY5C3Q3) |
 | 1 | ZHONG JING YUAN 1.29 inch PMOLED | White 128x64 display, CH1115 driver, IIC interface, PCB marking `CH1115-128x64DOT`, address `0x3C` | 20 x 45.8 x 2.7 mm | Model `CH1115-128x64DOT` | [AliExpress](https://www.aliexpress.com/item/1005003753680706.html) |
-| 4 | Dupont jumper wires | Female-to-female, 20 cm, for boards with fitted headers | 20 cm | Amazon ASIN `B07KYHBVR7` | [Amazon.nl](https://www.amazon.nl/dp/B07KYHBVR7) |
-| 1 | USB data cable | Use USB-C for the current Amazon ESP32. The older photographed board uses Micro-USB. Both cables below support data. | 0.9 m | Amazon ASINs `B01GGKYKQM` and `B0711PVX6Z` | [USB-C on Amazon.nl](https://www.amazon.nl/dp/B01GGKYKQM) or [Micro-USB on Amazon.nl](https://www.amazon.nl/dp/B0711PVX6Z) |
+| 4 | Dupont jumper wires | Use female-to-female or female-to-male depending on which headers are soldered to the ESP32 and display. The linked mixed kit includes both, plus male-to-male. | 20 cm | Amazon ASIN `B09KGRM98K` | [Amazon.nl mixed Dupont kit](https://www.amazon.nl/dp/B09KGRM98K) |
 | 1 | USB power supply | Regulated 5 V, 2 A USB-A supply with EU plug | Not applicable | Amazon ASIN `B0FS1PLFBR` | [Amazon.nl](https://www.amazon.nl/dp/B0FS1PLFBR) |
 
 The exact display is a ZHONG JING YUAN 1.29 inch PMOLED with a CH1115 driver. Its active area is 14.7 x 29.42 mm, its pixel pitch is 0.23 x 0.23 mm, and it uses a 2.54 mm pitch single-row pin connector. The specified operating temperature is -40 to 85 C. ESPHome drives this CH1115 module using `SH1106 128x64` compatibility mode.
 
-The ESP32 photographed during development has Micro-USB. The linked Amazon.nl AZ-Delivery revision uses USB-C and is compatible with the firmware and wiring. Purchase links were checked for the Netherlands on 9 August 2026. Prices, availability, and product revisions can change. These are direct non-affiliate links.
+The ESP32 photographed during development has Micro-USB. The linked Amazon.nl AZ-Delivery revision uses USB-C and is compatible with the firmware and wiring. AZ-Delivery includes the matching USB cable with the ESP32, so a separate cable is not required. Purchase links were checked for the Netherlands on 9 August 2026. Prices, availability, and product revisions can change. These are direct non-affiliate links.
 
 You also need Home Assistant with the ESPHome integration.
 
@@ -108,7 +107,7 @@ Install ESPHome on your computer:
 python -m pip install esphome
 ```
 
-Connect the ESP32 with a USB data cable, then run:
+Connect the ESP32 with the supplied USB cable, then run:
 
 ```bash
 esphome run firmware/ha-proxy-panel.yaml
