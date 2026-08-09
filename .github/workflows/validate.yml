@@ -39,7 +39,11 @@ jobs:
       - name: Reject accidental private values
         shell: bash
         run: |
-          if grep -RIE --exclude='secrets.example.yaml' --exclude-dir='.git' '(password:[[:space:]]*[^!]|api_encryption_key:[[:space:]]*[^!]|192\.168\.[0-9]+\.[0-9]+)' .; then
+          if grep -RIP \
+            --exclude='secrets.example.yaml' \
+            --exclude='validate.yml' \
+            --exclude-dir='.git' \
+            '(?:password|api_encryption_key):\s*(?![!]secret\b)\S+|192\.168\.[0-9]+\.[0-9]+' .; then
             echo "Potential private value found"
             exit 1
           fi
