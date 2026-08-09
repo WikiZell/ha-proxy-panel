@@ -1,0 +1,10 @@
+.esphome/
+build/
+firmware/secrets.yaml
+*.bin
+*.elf
+.DS_Store
+Thumbs.db
+node_modules/
+playwright-report/
+test-results/

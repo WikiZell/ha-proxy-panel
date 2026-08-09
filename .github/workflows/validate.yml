@@ -1,0 +1,44 @@
+name: Validate firmware
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  esphome:
+    runs-on: ubuntu-latest
+    container: ghcr.io/esphome/esphome:stable
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare test secrets
+        run: cp firmware/secrets.example.yaml firmware/secrets.yaml
+
+      - name: Validate ESPHome configuration
+        run: esphome config firmware/ha-proxy-panel.yaml
+
+  website:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check required website files
+        run: |
+          test -s docs/index.html
+          test -s docs/styles.css
+          test -s docs/app.js
+          test -s docs/assets/hero-device.png
+
+      - name: Reject accidental private values
+        shell: bash
+        run: |
+          if grep -RIE --exclude='secrets.example.yaml' --exclude-dir='.git' '(password:[[:space:]]*[^!]|api_encryption_key:[[:space:]]*[^!]|192\.168\.[0-9]+\.[0-9]+)' .; then
+            echo "Potential private value found"
+            exit 1
+          fi

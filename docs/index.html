@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1117">
+    <meta name="description" content="HA Proxy Panel is an ESPHome Bluetooth proxy with an OLED climate and status display for Home Assistant.">
+    <meta property="og:title" content="HA Proxy Panel">
+    <meta property="og:description" content="Bluetooth coverage you can see.">
+    <meta property="og:image" content="assets/hero-device.png">
+    <title>HA Proxy Panel</title>
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <a class="brand" href="#top" aria-label="HA Proxy Panel home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="7" y="7" width="18" height="18" rx="2"></rect>
+          <path d="M11 2v5M16 2v5M21 2v5M11 25v5M16 25v5M21 25v5M2 11h5M2 16h5M2 21h5M25 11h5M25 16h5M25 21h5"></path>
+        </svg>
+        <span>HA Proxy Panel</span>
+      </a>
+
+      <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" data-nav-toggle>
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="site-nav" aria-label="Main navigation" data-nav>
+        <a href="#features">Features</a>
+        <a href="#hardware">Hardware</a>
+        <a href="#install">Install</a>
+        <a href="#configuration">Configuration</a>
+        <a class="nav-github" href="https://github.com/WikiZell/ha-proxy-panel">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <h1><span>Bluetooth coverage</span><br>you can see.</h1>
+          <p>An ESPHome Bluetooth proxy with an OLED climate and status display for Home Assistant.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#install">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"></path></svg>
+              View installation
+            </a>
+            <a class="text-link" href="https://github.com/WikiZell/ha-proxy-panel">
+              GitHub repository
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-media" aria-label="ESP32 connected to an OLED status display">
+          <img src="assets/hero-device.png" alt="ESP32 board connected to an OLED showing temperature, humidity, and Bluetooth proxy status" width="1536" height="1024">
+        </div>
+      </section>
+
+      <section class="intro section" id="features">
+        <div class="section-heading intro-heading">
+          <span class="rail" aria-hidden="true"></span>
+          <div>
+            <h2>What is HA Proxy Panel?</h2>
+            <p>It turns an ESP32 and a small 128x64 OLED into a Bluetooth proxy with a live climate and status display. Configure what you see, rotate the screen from Home Assistant, and update the device over Wi-Fi.</p>
+          </div>
+        </div>
+
+        <div class="feature-list">
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 5V2l5 5L7 17"></path></svg>
+            <h3>Bluetooth proxy</h3>
+            <p>Extend Bluetooth coverage for nearby BLE devices.</p>
+          </article>
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 14.8V5a4 4 0 0 0-8 0v9.8a6 6 0 1 0 8 0ZM10 5v11"></path></svg>
+            <h3>Climate display</h3>
+            <p>See temperature and humidity at a glance.</p>
+          </article>
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4M8 4v4m8 2v4m-4 2v4"></path></svg>
+            <h3>HA controls</h3>
+            <p>Choose the display mode and rotation in Home Assistant.</p>
+          </article>
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 9a7 7 0 0 1 11.7-2L20 12M4 12l2.2 5a7 7 0 0 0 11.7-2"></path></svg>
+            <h3>Persistent settings</h3>
+            <p>Display choices survive power loss and restarts.</p>
+          </article>
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0M8 16a6 6 0 0 1 8 0M11 19.5a2 2 0 0 1 2 0"></path></svg>
+            <h3>Wi-Fi status</h3>
+            <p>Check signal, IP address, uptime, and availability.</p>
+          </article>
+          <article class="feature">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"></path></svg>
+            <h3>Safe OTA updates</h3>
+            <p>Install later firmware releases over your local network.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="hardware section" id="hardware">
+        <div class="section-heading">
+          <p class="section-number">01</p>
+          <div>
+            <h2>Four wires. One useful panel.</h2>
+            <p>The supplied configuration targets a MINI D1 ESP32 and a 128x64 CH1115 OLED using SH1106 compatibility mode.</p>
+          </div>
+        </div>
+
+        <div class="wiring-layout">
+          <div class="wiring-board" aria-label="OLED to ESP32 wiring diagram">
+            <div class="device device-esp">
+              <span>ESP32</span>
+              <small>MINI D1</small>
+              <i class="port port-1"></i><i class="port port-2"></i><i class="port port-3"></i><i class="port port-4"></i>
+            </div>
+            <div class="wire wire-red"><span>3.3V</span></div>
+            <div class="wire wire-slate"><span>GND</span></div>
+            <div class="wire wire-yellow"><span>GPIO21</span></div>
+            <div class="wire wire-blue"><span>GPIO22</span></div>
+            <div class="device device-oled">
+              <div class="oled-screen"><span>23.4 C</span><span>44%</span><small>BT PROXY ON</small></div>
+              <i class="port port-1"></i><i class="port port-2"></i><i class="port port-3"></i><i class="port port-4"></i>
+            </div>
+            <div class="wire-labels" aria-hidden="true"><span>VCC</span><span>GND</span><span>SDA</span><span>SCL</span></div>
+          </div>
+
+          <div class="wiring-notes">
+            <table>
+              <thead><tr><th>OLED</th><th>ESP32</th><th>Purpose</th></tr></thead>
+              <tbody>
+                <tr><td>VCC</td><td>3.3V</td><td>Display power</td></tr>
+                <tr><td>GND</td><td>GND</td><td>Ground</td></tr>
+                <tr><td>SDA</td><td>GPIO21</td><td>I2C data</td></tr>
+                <tr><td>SCL</td><td>GPIO22</td><td>I2C clock</td></tr>
+              </tbody>
+            </table>
+            <p class="safety-note"><strong>Power off before wiring.</strong> Use 3.3 V unless your OLED module documentation explicitly requires something else.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="install section" id="install">
+        <div class="section-heading">
+          <p class="section-number">02</p>
+          <div>
+            <h2>From parts to proxy.</h2>
+            <p>The first flash uses USB. Later updates can be installed over Wi-Fi.</p>
+          </div>
+        </div>
+
+        <ol class="steps">
+          <li>
+            <span class="step-number">1</span>
+            <div>
+              <h3>Prepare</h3>
+              <p>Clone the project and copy the example secrets file.</p>
+              <pre><code>git clone https://github.com/WikiZell/ha-proxy-panel.git
+cd ha-proxy-panel
+cp firmware/secrets.example.yaml firmware/secrets.yaml</code><button class="copy-button" type="button" data-copy aria-label="Copy prepare commands">Copy</button></pre>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">2</span>
+            <div>
+              <h3>Configure and flash</h3>
+              <p>Add your Wi-Fi details, generate new security keys, and set the two Home Assistant sensor entity IDs. Connect the ESP32 by USB.</p>
+              <pre><code>python -m pip install esphome
+esphome run firmware/ha-proxy-panel.yaml</code><button class="copy-button" type="button" data-copy aria-label="Copy flash commands">Copy</button></pre>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">3</span>
+            <div>
+              <h3>Add to Home Assistant</h3>
+              <p>Open Settings, Devices &amp; services, then select the discovered ESPHome device. Use the API encryption key when Home Assistant asks for it.</p>
+              <a class="text-link" href="https://github.com/WikiZell/ha-proxy-panel#quick-installation">Read the full installation guide <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="configuration section" id="configuration">
+        <div class="config-copy">
+          <p class="section-number">03</p>
+          <h2>Change the screen from Home Assistant.</h2>
+          <p>Two native dropdowns appear on the ESPHome device page. Changes take effect without reflashing and persist after a restart.</p>
+          <ul class="check-list">
+            <li>Climate, temperature, humidity, or proxy status</li>
+            <li>Normal or 180 degree rotation</li>
+            <li>Restart button and useful diagnostics</li>
+          </ul>
+        </div>
+
+        <div class="config-preview" aria-label="Home Assistant configuration preview">
+          <div class="preview-header">
+            <span class="preview-icon">HA</span>
+            <div><strong>HA Proxy Panel</strong><small>ESPHome</small></div>
+            <span class="connected">Connected</span>
+          </div>
+          <label>Display Content
+            <select aria-label="Display Content preview">
+              <option>Climate</option>
+              <option>Temperature</option>
+              <option>Humidity</option>
+              <option>Proxy Status</option>
+            </select>
+          </label>
+          <label>Display Rotation
+            <select aria-label="Display Rotation preview">
+              <option>Normal</option>
+              <option>Rotated 180</option>
+            </select>
+          </label>
+          <div class="preview-diagnostics"><span>Wi-Fi Signal</span><strong>-48 dBm</strong><span>Status</span><strong>Connected</strong></div>
+        </div>
+      </section>
+
+      <section class="docs-cta section">
+        <div>
+          <h2>Build yours with the complete guide.</h2>
+          <p>The repository includes the firmware, security template, wiring reference, troubleshooting notes, validation workflow, and Pages source.</p>
+        </div>
+        <a class="button button-outline" href="https://github.com/WikiZell/ha-proxy-panel#readme">Read the documentation
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>HA Proxy Panel is open source software released under the <a href="https://github.com/WikiZell/ha-proxy-panel/blob/main/LICENSE">MIT License</a>.</p>
+      <p>Independent community project. Not affiliated with or endorsed by Home Assistant.</p>
+      <a class="back-top" href="#top" aria-label="Back to top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 14 6-6 6 6M12 8v12"></path></svg></a>
+    </footer>
+  </body>
+</html>
