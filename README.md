@@ -27,12 +27,12 @@ The supplied configuration uses the ESPHome `esp32dev` board profile. It has bee
 | Qty | Part | Exact identification | Size | Supplier code | Purchase link |
 | --- | --- | --- | --- | --- | --- |
 | 1 | AZ-Delivery ESP32 D1 Mini NodeMCU, Micro-USB | ESP-WROOM-32, ESP32-D0WDQ6, CP2104, 4 MB flash, Wi-Fi and Bluetooth 4.2 | 39 x 31.5 mm, 12 g | SKU `A 20-2`, GTIN `4260581559441` | [AZ-Delivery ESP32 D1 Mini](https://www.az-delivery.de/en/products/esp32-d1-mini) |
-| 1 | 1.3 inch white OLED, I2C, 128x64 | Photographed PCB marking `CH1115-128x64DOT`, address `0x3C`; configured as SH1106 in ESPHome | AZ listing: 36 x 34 x 3 mm | AZ equivalent SKU `A 1-6`, GTIN `4260581550073` | [AZ-Delivery 1.3 inch OLED](https://www.az-delivery.de/en/products/1-3zoll-i2c-oled-display) |
+| 1 | ZHONG JING YUAN 1.29 inch PMOLED | White 128x64 display, CH1115 driver, IIC interface, PCB marking `CH1115-128x64DOT`, address `0x3C` | 20 x 45.8 x 2.7 mm | Model `CH1115-128x64DOT` | [Alibaba exact display](https://www.alibaba.com/product-detail/1-29-inch-OLED-display-module_1600894493988.html) |
 | 4 | Dupont jumper wires | Female-to-female for boards with fitted headers | About 10 to 20 cm | Any suitable set | Local electronics supplier |
 | 1 | USB data cable | Micro-USB data cable for the photographed ESP32; do not use a charge-only cable | Any practical length | Not fixed | Local electronics supplier |
 | 1 | USB power supply | Regulated 5 V USB supply, at least 1 A | Not applicable | Not fixed | Local electronics supplier |
 
-The pictured OLED is a CH1115 batch. AZ-Delivery currently describes its equivalent 1.3 inch product as SH1106, so check the controller or rear PCB marking when ordering. Both are supported by this project through ESPHome's `SH1106 128x64` compatibility mode. Store stock and product revisions can change, and these are direct non-affiliate links.
+The exact display is a ZHONG JING YUAN 1.29 inch PMOLED with a CH1115 driver. Its active area is 14.7 x 29.42 mm, its pixel pitch is 0.23 x 0.23 mm, and it uses a 2.54 mm pitch single-row pin connector. The specified operating temperature is -40 to 85 C. ESPHome drives this CH1115 module using `SH1106 128x64` compatibility mode.
 
 You also need Home Assistant with the ESPHome integration.
 
