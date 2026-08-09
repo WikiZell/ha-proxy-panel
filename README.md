@@ -2,7 +2,7 @@
 
 HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assistant Bluetooth proxy with a local climate and status display.
 
-[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Installation guide](https://wikizell.github.io/ha-proxy-panel/#install)
+[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Installation guide](https://wikizell.github.io/ha-proxy-panel/#install) | [Support WikiZell on Ko-fi](https://ko-fi.com/wikizell)
 
 ![HA Proxy Panel hardware render](docs/assets/hero-device.png)
 
