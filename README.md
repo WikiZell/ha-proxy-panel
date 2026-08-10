@@ -58,6 +58,33 @@ SCL  ----------------------  GPIO22
 
 ## Quick installation
 
+### HA Proxy Panel Manager for Windows
+
+Install ESPHome and run the desktop manager:
+
+```powershell
+python -m pip install esphome
+python tools/ha_proxy_panel_flasher.py
+```
+
+The application separates initial setup, device management, flashing, logs, and project information into individual tabs.
+
+- Sign in through Home Assistant's own browser login page, including MFA when enabled.
+- Store the resulting Home Assistant token and device secrets with Windows DPAPI encryption.
+- Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
+- Change display content and rotation immediately on paired panels.
+- Restart a paired panel and select it as an OTA update target.
+- Load temperature and humidity entities into editable dropdowns, while still allowing custom entity IDs.
+- Detect USB serial ports and show their adapter descriptions.
+- Validate, flash by USB, or update through the LAN.
+- Download and verify an exact official GitHub firmware commit before every flash or update.
+- Remove the temporary plaintext `secrets.yaml` after ESPHome finishes.
+- Provide right-click Cut, Copy, Paste, and Select All actions on input fields.
+
+The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly.
+
+Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for the current Windows user. ESPHome build files and downloaded firmware are stored under `%LOCALAPPDATA%\HAProxyPanel` and are not placed in the Git repository.
+
 ### 1. Download the project
 
 ```bash
@@ -166,6 +193,8 @@ Most installations only need the substitutions at the top of the file.
 | `display_title` | `HA PROXY PANEL` | OLED header, keep it short |
 | `temperature_entity` | example placeholder | Home Assistant temperature entity |
 | `humidity_entity` | example placeholder | Home Assistant humidity entity |
+| `display_mode_default` | `Climate` | Initial screen content on first boot |
+| `display_rotation_default` | `Normal` | Initial screen orientation on first boot |
 | `oled_model` | `SH1106 128x64` | ESPHome display model |
 | `oled_address` | `0x3C` | I2C address |
 | `oled_sda_pin` | `GPIO21` | I2C SDA pin |
@@ -206,6 +235,8 @@ No. The RESET or EN button resets the ESP32 electrically as soon as it is presse
 ```text
 firmware/ha-proxy-panel.yaml     ESPHome firmware
 firmware/secrets.example.yaml    Safe configuration template
+tools/ha_proxy_panel_flasher.py  Desktop manager launcher
+tools/ha_proxy_panel_app.py      Manager, discovery, security, and flashing logic
 docs/                            GitHub Pages website
 .github/workflows/               Firmware validation and Pages deployment
 ```

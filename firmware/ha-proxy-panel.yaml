@@ -4,6 +4,8 @@ substitutions:
   display_title: HA PROXY PANEL
   temperature_entity: sensor.your_temperature_sensor
   humidity_entity: sensor.your_humidity_sensor
+  display_mode_default: Climate
+  display_rotation_default: Normal
   oled_model: SH1106 128x64
   oled_address: "0x3C"
   oled_sda_pin: GPIO21
@@ -13,6 +15,9 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: false
+  project:
+    name: wikizell.ha-proxy-panel
+    version: "1.0.0"
 
 esp32:
   board: esp32dev
@@ -103,7 +108,7 @@ select:
       - Temperature
       - Humidity
       - Proxy Status
-    initial_option: Climate
+    initial_option: ${display_mode_default}
     optimistic: true
     restore_value: true
 
@@ -115,7 +120,7 @@ select:
     options:
       - Normal
       - Rotated 180
-    initial_option: Normal
+    initial_option: ${display_rotation_default}
     optimistic: true
     restore_value: true
 
