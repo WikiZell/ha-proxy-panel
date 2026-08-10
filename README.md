@@ -61,10 +61,16 @@ SCL  ----------------------  GPIO22
 
 ### HA Proxy Panel Manager for Windows
 
-Install ESPHome and run the desktop manager:
+Download the standalone Windows manager. It includes ESPHome, so Python is not required:
+
+[Download HA Proxy Panel Manager for Windows](https://github.com/WikiZell/ha-proxy-panel/releases/latest/download/HA-Proxy-Panel-Manager.exe)
+
+Windows may show a SmartScreen warning because this community executable is not code-signed. Verify the SHA256 value published with the GitHub release before running it.
+
+Developers can instead run the manager from source:
 
 ```powershell
-python -m pip install esphome
+python -m pip install -r tools/requirements-windows.txt
 python tools/ha_proxy_panel_flasher.py
 ```
 
@@ -76,7 +82,8 @@ The responsive manager uses a clear overview, a selected-device dashboard, a gui
 - Explain whether Wi-Fi came from encrypted app storage, the connected Windows profile, a selected saved profile, or manual entry.
 - Show Home Assistant, Wi-Fi, USB, panel-discovery, sensor, and installation-readiness status at a glance.
 - Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
-- Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, displayed values, climate sources, and Home Assistant entities.
+- Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, API security, Home Assistant update status, displayed values, climate sources, and Home Assistant entities.
+- Update the selected panel directly from the Devices page using the latest verified GitHub firmware while preserving its identity, sensors, rotation, and existing connection security.
 - Change display content, rotation, brightness, and OLED Care immediately on paired panels.
 - Prepare temperature and humidity source changes for a reviewed OTA update.
 - Restart a paired panel and select it as an OTA update target.
@@ -205,7 +212,7 @@ OLED Care is enabled by default. It moves the main content by one safe pixel ove
 
 ### Title and firmware notifications
 
-The top row is reserved for the panel title. Titles wider than the available area scroll continuously without entering the Wi-Fi indicator area. The panel checks the official GitHub version file after joining Wi-Fi and then every six hours. When a newer version exists, a small top indicator blinks and **NEW FW AVAILABLE** slides into the bottom status row. Press **Test Firmware Notification** to preview the same animation for 30 seconds. Update with the manager or Device Builder so the panel's identity, sensors, and credentials are compiled into the new firmware.
+The top row is reserved for the panel title. Titles wider than the available area scroll continuously without entering the Wi-Fi indicator area. The panel checks the official GitHub version file and also reads its Home Assistant ESPHome update entity. A blinking dot announces either update. The bottom tray identifies **PANEL FW UPDATE**, **ESPHOME UPDATE**, or **2 FW UPDATES**. Notification text always enters from below and stays below the separator, so it cannot overlap climate values. Press **Test Firmware Notification** to preview the same animation for 30 seconds. Update with the manager or Device Builder so the panel's identity, sensors, and credentials are preserved.
 
 ## Updating over Wi-Fi
 
@@ -228,6 +235,7 @@ Most installations only need the substitutions at the top of the file.
 | `display_title` | `HA PROXY PANEL` | OLED header; long titles scroll in the reserved top row |
 | `temperature_entity` | example placeholder | Home Assistant temperature entity |
 | `humidity_entity` | example placeholder | Home Assistant humidity entity |
+| `home_assistant_update_entity` | example placeholder | Home Assistant update entity for this ESPHome device |
 | `display_mode_default` | `Climate` | Initial screen content on first boot |
 | `display_rotation_default` | `Rotated 180` | Enclosure-friendly screen orientation on first boot |
 | `display_brightness_default` | `65` | Initial OLED brightness percentage |
@@ -279,6 +287,8 @@ firmware/components/panel_portal Modern offline Wi-Fi setup portal
 tools/ha_proxy_panel_flasher.py  Desktop manager launcher
 tools/ha_proxy_panel_app.py      Manager, discovery, security, and flashing logic
 tools/vendor/qrcodegen.py        Bundled offline QR encoder, MIT License
+tools/ha_proxy_panel_manager.spec Standalone Windows executable build definition
+tools/build_windows_exe.ps1      Reproducible Windows executable build script
 docs/                            GitHub Pages website
 .github/workflows/               Firmware validation and Pages deployment
 ```

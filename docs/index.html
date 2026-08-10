@@ -44,9 +44,9 @@
           <h1><span>Bluetooth coverage</span><br>you can see.</h1>
           <p>An ESPHome Bluetooth proxy with an OLED climate and status display for Home Assistant.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="#install">
+            <a class="button button-primary" href="https://github.com/WikiZell/ha-proxy-panel/releases/latest/download/HA-Proxy-Panel-Manager.exe">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"></path></svg>
-              View installation
+              Download Windows manager
             </a>
             <a class="text-link" href="https://github.com/WikiZell/ha-proxy-panel">
               GitHub repository
@@ -98,7 +98,7 @@
           <article class="feature">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M5 20h14"></path></svg>
             <h3>Update notifications</h3>
-            <p>A blinking indicator and sliding footer announce newer panel firmware.</p>
+            <p>A blinking indicator and bottom-up tray announce panel and ESPHome updates without covering climate data.</p>
           </article>
         </div>
       </section>
@@ -191,7 +191,7 @@ esphome run firmware/ha-proxy-panel.yaml</code><button class="copy-button" type=
             <span class="step-number">3</span>
             <div>
               <h3>Add to Home Assistant and Device Builder</h3>
-              <p>The manager securely adds the discovered ESPHome device to Home Assistant. Choose Add to Device Builder to create its exact maintainable YAML and namespaced secrets through protected Home Assistant ingress. Standalone users can use the Device Builder Adopt option advertised by the firmware.</p>
+              <p>The standalone Windows manager securely adds the discovered ESPHome device to Home Assistant. It can update a selected panel from GitHub and displays both project and Home Assistant ESPHome update status. Choose Add to Device Builder to create its exact maintainable YAML and namespaced secrets through protected Home Assistant ingress.</p>
               <a class="text-link" href="https://github.com/WikiZell/ha-proxy-panel#quick-installation">Read the full installation guide <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
             </div>
           </li>
@@ -208,7 +208,7 @@ esphome run firmware/ha-proxy-panel.yaml</code><button class="copy-button" type=
             <li>Normal or 180 degree rotation</li>
             <li>Brightness from 10 to 100 percent</li>
             <li>OLED Care switch and on-demand animation</li>
-            <li>Scrolling title, firmware notifications, restart button, and diagnostics</li>
+            <li>Scrolling title, panel and ESPHome update notifications, restart button, and diagnostics</li>
           </ul>
         </div>
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import asyncio
 import ctypes
 import hashlib
 import http.server
@@ -32,7 +33,7 @@ from vendor.qrcodegen import QrCode
 
 
 APP_NAME = "HA Proxy Panel"
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 APP_ROOT = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "HAProxyPanel"
 SETTINGS_FILE = APP_ROOT / "settings.json"
 SECURE_FILE = APP_ROOT / "secure.bin"
@@ -107,9 +108,20 @@ def device_builder_project(values: dict[str, str], firmware_ref: str) -> tuple[s
     substitutions = (
         "device_name", "friendly_name", "display_title", "temperature_entity",
         "humidity_entity", "display_mode_default", "display_rotation_default",
-        "display_brightness_default", "oled_care_restore_mode",
+        "display_brightness_default", "oled_care_restore_mode", "home_assistant_update_entity",
     )
     substitution_yaml = "\n".join(f"  {key}: {yaml_string(values[key])}" for key in substitutions)
+    encrypted_api = values.get("api_encryption_mode", "encrypted") != "plaintext"
+    password_ota = values.get("ota_password_mode", "password") != "none"
+    api_yaml = (
+        f"\napi:\n  encryption:\n    key: !secret {secret_names['api_encryption_key']}\n"
+        if encrypted_api else ""
+    )
+    ota_yaml = (
+        f"\nota:\n  - platform: esphome\n    id: !extend esphome_ota\n"
+        f"    password: !secret {secret_names['ota_password']}\n"
+        if password_ota else ""
+    )
     project = f"""{DEVICE_BUILDER_MARKER}
 # Safe to edit in ESPHome Device Builder. Re-running the manager updates this file.
 substitutions:
@@ -123,16 +135,7 @@ packages:
     files:
       - firmware/ha-proxy-panel.yaml
     refresh: 1d
-
-api:
-  encryption:
-    key: !secret {secret_names['api_encryption_key']}
-
-ota:
-  - platform: esphome
-    id: !extend esphome_ota
-    password: !secret {secret_names['ota_password']}
-
+{api_yaml}{ota_yaml}
 wifi:
   ssid: !secret {secret_names['wifi_ssid']}
   password: !secret {secret_names['wifi_password']}
@@ -143,7 +146,12 @@ qr_code:
   - id: !extend fallback_wifi_qr
     value: !secret {secret_names['fallback_ap_qr']}
 """
-    secrets_update = {secret_names[key]: values[key] for key in secret_names}
+    used_secret_keys = ["wifi_ssid", "wifi_password", "fallback_ap_password", "fallback_ap_qr"]
+    if encrypted_api:
+        used_secret_keys.append("api_encryption_key")
+    if password_ota:
+        used_secret_keys.append("ota_password")
+    secrets_update = {secret_names[key]: values[key] for key in used_secret_keys}
     return project, secrets_update
 
 
@@ -284,7 +292,7 @@ class HomeAssistantClient:
         try:
             import websocket
         except ImportError as exc:
-            raise RuntimeError("Device Builder setup needs websocket-client, included with ESPHome.") from exc
+            raise RuntimeError("Device Builder setup needs websocket-client, included with the Windows manager.") from exc
         parsed = urllib.parse.urlsplit(self.base_url)
         scheme = "wss" if parsed.scheme == "https" else "ws"
         ws_url = urllib.parse.urlunsplit((scheme, parsed.netloc, "/api/websocket", "", ""))
@@ -376,6 +384,30 @@ class HomeAssistantClient:
             "validation": "passed",
         }
 
+    def read_device_builder_project(self, configuration: str) -> str | None:
+        """Read one existing Device Builder YAML through protected ingress."""
+        session_result, addon_result = self._supervisor_requests([
+            {"endpoint": "/ingress/session", "method": "post"},
+            {"endpoint": f"/addons/{DEVICE_BUILDER_ADDON}/info", "method": "get"},
+        ])
+        session = str(session_result.get("session", "")) if isinstance(session_result, dict) else ""
+        ingress = str(addon_result.get("ingress_url", "")) if isinstance(addon_result, dict) else ""
+        if not session or not ingress:
+            return None
+        listed = self._device_builder_commands(session, ingress, [("devices/list", None)])[0]
+        configured = listed.get("configured", []) if isinstance(listed, dict) else []
+        if not any(
+            isinstance(item, dict) and item.get("configuration") == configuration
+            for item in configured
+        ):
+            return None
+        result = self._device_builder_commands(
+            session,
+            ingress,
+            [("devices/get_config", {"configuration": configuration})],
+        )[0]
+        return result if isinstance(result, str) else None
+
     def _validate_device_builder_project(
         self,
         session: str,
@@ -386,7 +418,7 @@ class HomeAssistantClient:
         try:
             import websocket
         except ImportError as exc:
-            raise RuntimeError("Device Builder setup needs websocket-client, included with ESPHome.") from exc
+            raise RuntimeError("Device Builder setup needs websocket-client, included with the Windows manager.") from exc
         parsed = urllib.parse.urlsplit(self.base_url)
         scheme = "wss" if parsed.scheme == "https" else "ws"
         ingress_path = "/" + ingress.strip("/") + "/ws"
@@ -431,7 +463,7 @@ class HomeAssistantClient:
         try:
             import websocket
         except ImportError as exc:
-            raise RuntimeError("Device Builder setup needs websocket-client, included with ESPHome.") from exc
+            raise RuntimeError("Device Builder setup needs websocket-client, included with the Windows manager.") from exc
         parsed = urllib.parse.urlsplit(self.base_url)
         scheme = "wss" if parsed.scheme == "https" else "ws"
         ingress_path = "/" + ingress.strip("/") + "/ws"
@@ -608,8 +640,17 @@ def windows_wifi_password(ssid: str) -> str:
 
 
 def esphome_command() -> list[str]:
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--esphome-cli"]
     executable = shutil.which("esphome")
     return [executable] if executable else [sys.executable, "-m", "esphome"]
+
+
+def run_bundled_esphome() -> int:
+    """Run the ESPHome CLI embedded in the standalone Windows manager."""
+    sys.argv = [sys.argv[0], *[arg for arg in sys.argv[1:] if arg != "--esphome-cli"]]
+    from esphome.__main__ import main as esphome_main
+    return int(esphome_main() or 0)
 
 
 class ProxyPanelApp(tk.Tk):
@@ -668,6 +709,9 @@ class ProxyPanelApp(tk.Tk):
         self.display_title = tk.StringVar(value=str(self.settings.get("display_title", "HA PROXY PANEL")))
         self.temperature_entity = tk.StringVar(value=str(self.settings.get("temperature_entity", "sensor.your_temperature_sensor")))
         self.humidity_entity = tk.StringVar(value=str(self.settings.get("humidity_entity", "sensor.your_humidity_sensor")))
+        self.home_assistant_update_entity = tk.StringVar(
+            value=str(self.settings.get("home_assistant_update_entity", "update.your_panel_firmware"))
+        )
         self.display_mode = tk.StringVar(value=str(self.settings.get("display_mode", "Climate")))
         self.display_rotation = tk.StringVar(value=saved_rotation)
         self.display_brightness = tk.IntVar(value=int(self.settings.get("display_brightness", 65)))
@@ -930,6 +974,13 @@ class ProxyPanelApp(tk.Tk):
             state="disabled",
         )
         self.add_builder_button.pack(side="left", padx=(0, 8))
+        self.update_panel_button = ttk.Button(
+            actions,
+            text="Update selected panel",
+            command=self.update_selected_panel,
+            state="disabled",
+        )
+        self.update_panel_button.pack(side="left", padx=(0, 8))
         ttk.Button(actions, text="Open HA integrations", command=self.open_home_assistant).pack(side="left")
         ttk.Label(bar, textvariable=self.ha_add_status, foreground="#667085").grid(row=1, column=0, sticky="w", pady=(6, 0))
         ttk.Label(bar, textvariable=self.device_builder_status, foreground="#667085").grid(row=2, column=0, sticky="w", pady=(2, 0))
@@ -968,6 +1019,7 @@ class ProxyPanelApp(tk.Tk):
             ("IP address", "ip"), ("Node name", "node_name"), ("Connection", "source"), ("Status", "status"),
             ("Wi-Fi signal", "signal"), ("Uptime", "uptime"), ("Firmware", "firmware_version"),
             ("Displayed temperature", "display_temperature"), ("Displayed humidity", "display_humidity"),
+            ("HA firmware update", "home_assistant_update"), ("API security", "api_security"),
         )
         for index, (label, key) in enumerate(detail_fields):
             grid_row, pair = divmod(index, 2); column = pair * 2
@@ -1275,6 +1327,7 @@ class ProxyPanelApp(tk.Tk):
             "device_name": self.device_name.get().strip(), "friendly_name": self.friendly_name.get().strip(),
             "display_title": self.display_title.get().strip(), "temperature_entity": self.temperature_entity.get().strip(),
             "humidity_entity": self.humidity_entity.get().strip(), "display_mode": self.display_mode.get(),
+            "home_assistant_update_entity": self.home_assistant_update_entity.get().strip(),
             "display_rotation": self.display_rotation.get(), "wifi_ssid": self.wifi_ssid.get(),
             "display_brightness": self.display_brightness.get(), "oled_care": self.oled_care.get(),
             "ota_target": self.ota_target.get().strip(),
@@ -1457,6 +1510,7 @@ class ProxyPanelApp(tk.Tk):
 
     def _discovery_worker(self, base_url: str = "", token: str = "") -> None:
         panels: dict[str, Panel] = {}
+        states: list[dict[str, object]] = []
         if token:
             states = HomeAssistantClient(base_url, token).states()
             panels.update(self._panels_from_states(states))
@@ -1473,7 +1527,15 @@ class ProxyPanelApp(tk.Tk):
                     text = f"{node} {friendly} {project}".casefold()
                     if not any(word in text for word in ("ha-proxy-panel", "proxy panel", "bluetooth proxy")): return
                     addresses = info.parsed_addresses(); ip = addresses[0] if addresses else ""
-                    discovered.append(Panel(f"lan:{node}", friendly, ip, "LAN", "discovered", node_name=node))
+                    discovered.append(Panel(
+                        f"lan:{node}", friendly, ip, "LAN", "discovered",
+                        values={
+                            "api_encryption": props.get("api_encryption", "plaintext"),
+                            "esphome_version": props.get("version", ""),
+                            "project_version": props.get("project_version", ""),
+                        },
+                        node_name=node,
+                    ))
                 def update_service(self, zc: Zeroconf, service_type: str, name: str) -> None: self.add_service(zc, service_type, name)
                 def remove_service(self, _zc: Zeroconf, _service_type: str, _name: str) -> None: pass
             zc = Zeroconf(); browser = ServiceBrowser(zc, "_esphomelib._tcp.local.", Listener()); time.sleep(4); browser.cancel(); zc.close()
@@ -1485,11 +1547,82 @@ class ProxyPanelApp(tk.Tk):
                 )), None)
                 if match:
                     match.source = "HA + LAN"; match.node_name = panel.node_name
+                    match.values.update(panel.values)
                     if panel.ip: match.ip = panel.ip
                     if match.status not in ("on", "online"): match.status = "discovered"
                 else: panels[panel.key] = panel
         except ImportError: self.log_queue.put("LAN discovery needs the zeroconf package included with ESPHome.\n")
+        # Windows can block multicast discovery for an unsigned executable. Directly
+        # probe the HA-reported address as a reliable fallback, using only keys that
+        # are already stored locally by this manager. This also identifies older
+        # plaintext panels without weakening encrypted panels.
+        unresolved = [panel for panel in panels.values() if panel.ip and not panel.node_name]
+        if unresolved:
+            try:
+                asyncio.run(self._probe_panels_directly(unresolved))
+            except Exception as exc:
+                self.log_queue.put(f"Direct panel discovery was unavailable: {exc}\n")
+        if token and states:
+            by_id = {str(state.get("entity_id", "")): state for state in states}
+            client = HomeAssistantClient(base_url, token)
+            for panel in panels.values():
+                if not panel.node_name or (
+                    panel.values.get("temperature_source") and panel.values.get("humidity_source")
+                ):
+                    continue
+                try:
+                    project = client.read_device_builder_project(f"{panel.node_name}.yaml") or ""
+                except Exception:
+                    project = ""
+                for entity_id in set(re.findall(r"\bentity_id:\s*([a-z0-9_]+\.[a-z0-9_]+)", project)):
+                    entity = by_id.get(entity_id, {})
+                    attrs = entity.get("attributes") or {} if isinstance(entity, dict) else {}
+                    if not isinstance(attrs, dict):
+                        continue
+                    device_class = str(attrs.get("device_class", ""))
+                    unit = str(attrs.get("unit_of_measurement", ""))
+                    if device_class == "temperature" or unit in ("°C", "°F", "Â°C", "Â°F"):
+                        panel.values.setdefault("temperature_source", entity_id)
+                    elif device_class == "humidity" or (
+                        unit == "%" and "humidity" in entity_id
+                    ):
+                        panel.values.setdefault("humidity_source", entity_id)
         self.ui_queue.put(("devices", panels))
+
+    async def _probe_panels_directly(self, panels: list[Panel]) -> None:
+        """Fill node and firmware metadata without relying on inbound mDNS."""
+        from aioesphomeapi import APIClient
+
+        async def probe(panel: Panel) -> None:
+            candidates: list[tuple[str, str | None]] = list(self.panel_api_keys.items())
+            candidates.append(("", None))
+            for key_name, noise_psk in candidates:
+                client = APIClient(
+                    panel.ip,
+                    6053,
+                    client_info=f"HA Proxy Panel Manager {APP_VERSION}",
+                    noise_psk=noise_psk,
+                )
+                try:
+                    await asyncio.wait_for(client.connect(login=True, log_errors=False), timeout=7)
+                    info = await asyncio.wait_for(client.device_info(), timeout=7)
+                    panel.node_name = str(info.name)
+                    panel.source = "HA + LAN"
+                    panel.values["api_encryption"] = "encrypted" if noise_psk else "plaintext"
+                    panel.values["esphome_version"] = str(info.esphome_version)
+                    panel.values["project_version"] = str(info.project_version)
+                    if noise_psk and panel.node_name and key_name != panel.node_name:
+                        self.panel_api_keys[panel.node_name] = noise_psk
+                    return
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        await client.disconnect(force=True)
+                    except Exception:
+                        pass
+
+        await asyncio.gather(*(probe(panel) for panel in panels))
 
     @staticmethod
     def _panels_from_states(states: list[dict[str, object]]) -> dict[str, Panel]:
@@ -1525,6 +1658,26 @@ class ProxyPanelApp(tk.Tk):
                 if legacy_firmware in by_id:
                     panel.entities["firmware_version"] = legacy_firmware
                     panel.values["firmware_version"] = str(by_id[legacy_firmware].get("state", ""))
+            panel_name = panel.name.casefold()
+            for update_id, update_state in by_id.items():
+                if not update_id.startswith("update."):
+                    continue
+                update_attrs = update_state.get("attributes") or {}
+                if not isinstance(update_attrs, dict):
+                    continue
+                update_name = str(update_attrs.get("friendly_name", "")).casefold()
+                if not update_name.startswith(panel_name):
+                    continue
+                panel.entities["home_assistant_update"] = update_id
+                installed = str(update_attrs.get("installed_version", "")).strip()
+                latest = str(update_attrs.get("latest_version", "")).strip()
+                state = str(update_state.get("state", ""))
+                panel.values["home_assistant_update"] = (
+                    f"{installed} -> {latest}" if state == "on" and installed and latest
+                    else "Up to date" if state == "off"
+                    else state or "Not reported"
+                )
+                break
             panels[panel.key] = panel
         return panels
 
@@ -1550,6 +1703,9 @@ class ProxyPanelApp(tk.Tk):
             panel.ip and self.ha_token.get().strip() and self._panel_profile(panel)
         )
         self.add_builder_button.configure(state="normal" if can_add_builder else "disabled")
+        self.update_panel_button.configure(
+            state="normal" if panel.ip and self._panel_profile(panel) else "disabled"
+        )
         if healthy_in_ha:
             self.ha_add_status.set("Connected through Home Assistant's ESPHome integration")
         elif not self.ha_token.get().strip():
@@ -1588,6 +1744,11 @@ class ProxyPanelApp(tk.Tk):
             "uptime": uptime or "Not reported", "firmware_version": reported("firmware_version"),
             "display_temperature": reported("display_temperature"),
             "display_humidity": reported("display_humidity"),
+            "home_assistant_update": reported("home_assistant_update"),
+            "api_security": (
+                "Encrypted" if panel.values.get("api_encryption", "") != "plaintext"
+                else "Legacy plaintext"
+            ),
         }
         for key, variable in self.device_detail_vars.items(): variable.set(details.get(key, "Not reported"))
         self.selected_temp_source.set("" if reported("temperature_source") == "Not reported" else reported("temperature_source"))
@@ -1605,6 +1766,9 @@ class ProxyPanelApp(tk.Tk):
         if not ENTITY_ID_RE.fullmatch(temperature) or not ENTITY_ID_RE.fullmatch(humidity):
             messagebox.showerror("Sensor sources required", "Choose or type valid temperature and humidity entity IDs."); return
         self.temperature_entity.set(temperature); self.humidity_entity.set(humidity)
+        self.home_assistant_update_entity.set(
+            panel.entities.get("home_assistant_update", "update.your_panel_firmware")
+        )
         self.friendly_name.set(panel.name)
         if panel.node_name: self.device_name.set(panel.node_name)
         if panel.ip: self.ota_target.set(panel.ip)
@@ -1664,14 +1828,77 @@ class ProxyPanelApp(tk.Tk):
 
     def _panel_profile(self, panel: Panel) -> dict[str, str]:
         node_name = panel.node_name.strip()
+        profile: dict[str, str] = {}
         if node_name and node_name in self.panel_profiles:
-            return dict(self.panel_profiles[node_name])
-        if node_name and node_name == self.device_name.get().strip():
+            profile = dict(self.panel_profiles[node_name])
+        elif node_name and node_name == self.device_name.get().strip():
             try:
-                return self._values()
+                profile = self._values()
             except Exception:
+                profile = {}
+        elif node_name and panel.ip and panel.values.get("temperature_source") and panel.values.get("humidity_source"):
+            api_mode = "plaintext" if panel.values.get("api_encryption") == "plaintext" else "encrypted"
+            api_key = self.panel_api_keys.get(node_name, self.api_key.get().strip())
+            if api_mode == "encrypted" and node_name not in self.panel_api_keys:
                 return {}
-        return {}
+            title = panel.name.upper().replace(" BLUETOOTH", "")
+            profile = {
+                "device_name": node_name,
+                "friendly_name": panel.name,
+                "display_title": title,
+                "temperature_entity": panel.values["temperature_source"],
+                "humidity_entity": panel.values["humidity_source"],
+                "display_mode_default": panel.values.get("display_content", "Climate"),
+                "display_rotation_default": panel.values.get("display_rotation", "Rotated 180"),
+                "display_brightness_default": panel.values.get("display_brightness", "65"),
+                "oled_care_restore_mode": (
+                    "RESTORE_DEFAULT_OFF" if panel.values.get("oled_care") == "off"
+                    else "RESTORE_DEFAULT_ON"
+                ),
+                "wifi_ssid": self.wifi_ssid.get(),
+                "wifi_password": self.wifi_password.get(),
+                "api_encryption_key": api_key,
+                "ota_password": self.ota_password.get(),
+                "fallback_ap_password": self.fallback_password.get(),
+                "api_encryption_mode": api_mode,
+                "ota_password_mode": "none" if api_mode == "plaintext" else "password",
+            }
+            profile["fallback_ap_qr"] = self._wifi_qr_payload(
+                "HA Proxy Panel Fallback", profile["fallback_ap_password"]
+            )
+        if not profile:
+            return {}
+        profile["home_assistant_update_entity"] = panel.entities.get(
+            "home_assistant_update", profile.get("home_assistant_update_entity", "update.your_panel_firmware")
+        )
+        profile.setdefault("api_encryption_mode", "encrypted")
+        profile.setdefault("ota_password_mode", "password")
+        return profile
+
+    def update_selected_panel(self) -> None:
+        panel = self._selected_panel()
+        if not panel or not panel.ip:
+            messagebox.showinfo("Select a panel", "Select a discovered panel with a LAN address.")
+            return
+        values = self._panel_profile(panel)
+        if not values:
+            messagebox.showerror(
+                "Build profile unavailable",
+                "The manager cannot safely reproduce this panel's credentials and settings.",
+            )
+            return
+        self.panel_profiles[values["device_name"]] = dict(values)
+        if values.get("api_encryption_mode") != "plaintext":
+            self.panel_api_keys[values["device_name"]] = values["api_encryption_key"]
+        if self.remember.get():
+            self.save_settings()
+        self.status.set(f"Updating {panel.name} from the official GitHub firmware")
+        self.worker = threading.Thread(
+            target=self._esphome_worker,
+            args=("ota", values, panel.ip),
+            daemon=True,
+        )
+        self.worker.start()
 
     def add_selected_to_device_builder(self) -> None:
         panel = self._selected_panel()
@@ -1771,9 +1998,11 @@ class ProxyPanelApp(tk.Tk):
             "display_rotation_default": self.display_rotation.get(),
             "display_brightness_default": str(self.display_brightness.get()),
             "oled_care_restore_mode": "RESTORE_DEFAULT_ON" if self.oled_care.get() else "RESTORE_DEFAULT_OFF",
+            "home_assistant_update_entity": self.home_assistant_update_entity.get().strip(),
             "wifi_ssid": self.wifi_ssid.get(),
             "wifi_password": self.wifi_password.get(), "api_encryption_key": self.api_key.get(),
             "ota_password": self.ota_password.get(), "fallback_ap_password": self.fallback_password.get(),
+            "api_encryption_mode": "encrypted", "ota_password_mode": "password",
         }
         values["fallback_ap_qr"] = self._wifi_qr_payload(
             "HA Proxy Panel Fallback", values["fallback_ap_password"]
@@ -1809,20 +2038,20 @@ class ProxyPanelApp(tk.Tk):
             substitution_keys = (
                 "device_name", "friendly_name", "display_title", "temperature_entity",
                 "humidity_entity", "display_mode_default", "display_rotation_default",
-                "display_brightness_default", "oled_care_restore_mode",
+                "display_brightness_default", "oled_care_restore_mode", "home_assistant_update_entity",
             )
             substitutions = "\n".join(f"  {k}: {yaml_string(values[k])}" for k in substitution_keys)
             substitutions += f"\n  firmware_ref: {yaml_string(sha)}"
-            secure_overrides = """
-
-api:
-  encryption:
-    key: !secret api_encryption_key
-
-ota:
-  - platform: esphome
-    id: !extend esphome_ota
-    password: !secret ota_password
+            api_override = (
+                "\napi:\n  encryption:\n    key: !secret api_encryption_key\n"
+                if values.get("api_encryption_mode", "encrypted") != "plaintext" else ""
+            )
+            ota_override = (
+                "\nota:\n  - platform: esphome\n    id: !extend esphome_ota\n"
+                "    password: !secret ota_password\n"
+                if values.get("ota_password_mode", "password") != "none" else ""
+            )
+            connection_overrides = """
 
 wifi:
   ssid: !secret wifi_ssid
@@ -1836,7 +2065,7 @@ qr_code:
 """
             (work / "device.yaml").write_text(
                 f"substitutions:\n{substitutions}\n\npackages:\n  panel: !include ha-proxy-panel-base.yaml\n"
-                + secure_overrides,
+                + api_override + ota_override + connection_overrides,
                 encoding="utf-8",
             )
             secrets_path.write_text("\n".join(f"{k}: {yaml_string(values[k])}" for k in ("wifi_ssid", "wifi_password", "api_encryption_key", "ota_password", "fallback_ap_password", "fallback_ap_qr")) + "\n", encoding="utf-8")

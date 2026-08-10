@@ -122,6 +122,7 @@ packages:
             "display_title": "A LONG FIRST FLOOR TITLE",
             "temperature_entity": "sensor.average_temp_1_floor",
             "humidity_entity": "sensor.average_humidity_1_floor",
+            "home_assistant_update_entity": "update.first_floor_proxy_firmware",
             "display_mode_default": "Climate",
             "display_rotation_default": "Rotated 180",
             "display_brightness_default": "65",
@@ -144,6 +145,33 @@ packages:
             secrets_update["hpp_first_floor_bluetooth_proxy_ota_password"],
             "private-ota-password",
         )
+
+    def test_plaintext_legacy_project_preserves_existing_connection_mode(self) -> None:
+        values = {
+            "device_name": "second-floor-bluetooth-proxy",
+            "friendly_name": "2nd Floor Bluetooth Proxy",
+            "display_title": "2ND FLOOR PROXY",
+            "temperature_entity": "sensor.average_temp_2_floor",
+            "humidity_entity": "sensor.average_humidity_2_floor",
+            "home_assistant_update_entity": "update.your_panel_firmware",
+            "display_mode_default": "Climate",
+            "display_rotation_default": "Normal",
+            "display_brightness_default": "65",
+            "oled_care_restore_mode": "RESTORE_DEFAULT_ON",
+            "wifi_ssid": "test-network",
+            "wifi_password": "private-wifi-password",
+            "api_encryption_key": "unused-private-api-key",
+            "ota_password": "unused-private-ota-password",
+            "fallback_ap_password": "private-fallback-password",
+            "fallback_ap_qr": "private-fallback-qr",
+            "api_encryption_mode": "plaintext",
+            "ota_password_mode": "none",
+        }
+        project, secrets_update = device_builder_project(values, "abc123")
+        self.assertNotIn("api_encryption_key", project)
+        self.assertNotIn("ota_password", project)
+        self.assertNotIn("api_encryption_key", " ".join(secrets_update))
+        self.assertNotIn("ota_password", " ".join(secrets_update))
 
     def test_version_comparison_ignores_labels(self) -> None:
         self.assertGreater(version_key("v1.5.1-beta"), version_key("1.5.0"))

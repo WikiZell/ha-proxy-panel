@@ -1,6 +1,7 @@
 .esphome/
 firmware/.esphome/
 build/
+dist/
 firmware/secrets.yaml
 *.bin
 *.elf

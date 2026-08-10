@@ -4,6 +4,7 @@ substitutions:
   display_title: HA PROXY PANEL
   temperature_entity: sensor.your_temperature_sensor
   humidity_entity: sensor.your_humidity_sensor
+  home_assistant_update_entity: update.your_panel_firmware
   display_mode_default: Climate
   display_rotation_default: Rotated 180
   display_brightness_default: "65"
@@ -21,7 +22,7 @@ esphome:
   name_add_mac_suffix: false
   project:
     name: wikizell.ha-proxy-panel
-    version: "1.5.0"
+    version: "1.6.0"
 
 dashboard_import:
   package_import_url: github://WikiZell/ha-proxy-panel/firmware/ha-proxy-panel.yaml@main
@@ -56,7 +57,7 @@ wifi:
 captive_portal:
 
 http_request:
-  useragent: HA-Proxy-Panel/1.5.0
+  useragent: HA-Proxy-Panel/1.6.0
   timeout: 10s
   verify_ssl: true
 
@@ -91,7 +92,15 @@ binary_sensor:
     name: Firmware Update Available
     entity_category: diagnostic
     lambda: |-
-      return id(firmware_update_available_flag);
+      return id(firmware_update_available_flag) ||
+             id(firmware_notification_test_active) ||
+             (id(home_assistant_update_available).has_state() &&
+              id(home_assistant_update_available).state);
+
+  - platform: homeassistant
+    id: home_assistant_update_available
+    entity_id: ${home_assistant_update_entity}
+    internal: true
 
 sensor:
   - platform: wifi_signal
@@ -223,6 +232,10 @@ globals:
     type: std::string
     restore_value: false
     initial_value: '""'
+  - id: firmware_notification_test_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
 
 script:
   - id: run_oled_care_animation
@@ -400,7 +413,13 @@ display:
         it.printf(title_cycle - title_scroll, 0, id(font_small), "%s", title.c_str());
       }
       it.filled_rectangle(107, 0, 21, 12, COLOR_OFF);
-      const bool update_available = id(firmware_update_available_flag);
+      const bool panel_update_available = id(firmware_update_available_flag);
+      const bool esphome_update_available =
+          id(home_assistant_update_available).has_state() &&
+          id(home_assistant_update_available).state;
+      const bool update_available = panel_update_available ||
+                                    esphome_update_available ||
+                                    id(firmware_notification_test_active);
       if (update_available && ((millis() / 500) & 1))
         it.filled_rectangle(107, 2, 3, 3);
       if (id(wifi_rssi).has_state()) {
@@ -470,20 +489,21 @@ display:
         }
       }
 
-      // The bottom row becomes a notification tray. Firmware updates slide in
-      // from above, remain readable, then slide away to restore proxy status.
+      // The bottom row becomes a notification tray. Messages only enter from
+      // below and are never drawn above the separator, so they cannot overlap
+      // climate values or the normal proxy-status text.
       it.line(0, 48, 127, 48);
       const bool climate_available =
           id(climate_temperature).has_state() || id(climate_humidity).has_state();
       int normal_footer_y = 52;
-      int update_footer_y = 38;
+      int update_footer_y = 66;
       bool show_update_footer = false;
       if (update_available) {
         const int footer_phase = millis() % 20000;
         if (footer_phase < 1000) {
           const int slide = (footer_phase * 14) / 1000;
-          normal_footer_y = 52 + slide;
-          update_footer_y = 38 + slide;
+          normal_footer_y = 66;
+          update_footer_y = 66 - slide;
           show_update_footer = true;
         } else if (footer_phase < 7000) {
           normal_footer_y = 66;
@@ -492,15 +512,22 @@ display:
         } else if (footer_phase < 8000) {
           const int slide = ((footer_phase - 7000) * 14) / 1000;
           normal_footer_y = 66 - slide;
-          update_footer_y = 52 + slide;
-          show_update_footer = true;
+          show_update_footer = false;
         }
       }
       it.printf(0, normal_footer_y, id(font_small), "BT PROXY %s DATA %s",
                 id(proxy_status).state ? "ON" : "OFF",
                 climate_available ? "OK" : "--");
-      if (show_update_footer)
-        it.printf(12, update_footer_y, id(font_small), "NEW FW AVAILABLE");
+      if (show_update_footer) {
+        const char *update_text = "TEST FW UPDATE";
+        if (panel_update_available && esphome_update_available)
+          update_text = "2 FW UPDATES";
+        else if (panel_update_available)
+          update_text = "PANEL FW UPDATE";
+        else if (esphome_update_available)
+          update_text = "ESPHOME UPDATE";
+        it.printf(12, update_footer_y, id(font_small), "%s", update_text);
+      }
 
 button:
   - platform: template
@@ -518,10 +545,10 @@ button:
     entity_category: diagnostic
     on_press:
       - lambda: |-
-          id(firmware_update_available_flag) = true;
+          id(firmware_notification_test_active) = true;
       - delay: 30s
       - lambda: |-
-          id(firmware_update_available_flag) = false;
+          id(firmware_notification_test_active) = false;
 
   - platform: restart
     name: Restart
