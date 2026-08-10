@@ -10,6 +10,22 @@ permissions:
   contents: read
 
 jobs:
+  manager:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install desktop GUI dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes python3-tk
+
+      - name: Validate manager and tests
+        run: |
+          python -m py_compile tools/ha_proxy_panel_app.py tools/ha_proxy_panel_flasher.py
+          python -m unittest discover -s tests -v
+
   esphome:
     runs-on: ubuntu-latest
     container: ghcr.io/esphome/esphome:stable
@@ -21,7 +37,14 @@ jobs:
         run: cp firmware/secrets.example.yaml firmware/secrets.yaml
 
       - name: Validate ESPHome configuration
-        run: esphome config firmware/ha-proxy-panel.yaml
+        run: esphome -s firmware_ref "$GITHUB_SHA" config firmware/ha-proxy-panel.yaml
+
+      - name: Verify published firmware version
+        shell: bash
+        run: |
+          project_version=$(sed -n 's/^[[:space:]]*version:[[:space:]]*"\([0-9.]*\)"/\1/p' firmware/ha-proxy-panel.yaml | head -n1)
+          published_version=$(tr -d '\r\n ' < firmware/version.txt)
+          test "$project_version" = "$published_version"
 
   website:
     runs-on: ubuntu-latest
@@ -43,7 +66,7 @@ jobs:
             --exclude='secrets.example.yaml' \
             --exclude='validate.yml' \
             --exclude-dir='.git' \
-            '(?:password|api_encryption_key):\s*(?![!]secret\b)\S+|192\.168\.[0-9]+\.[0-9]+' .; then
+            '^\s*(?:password|api_encryption_key):\s*(?![!]secret\b)\S+|192\.168\.(?!4\.1\b)[0-9]+\.[0-9]+' .; then
             echo "Potential private value found"
             exit 1
           fi

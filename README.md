@@ -16,7 +16,8 @@ HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assista
 - Wi-Fi strength, IP address, uptime, proxy state, and data availability
 - CH1115 edge-wrap correction when used in SH1106 compatibility mode
 - Safe encrypted Home Assistant API and password-protected OTA updates
-- Captive-portal fallback when normal Wi-Fi is unavailable
+- Captive-portal fallback with an on-screen Wi-Fi QR when normal Wi-Fi is unavailable
+- Automatic ESPHome discovery and an **Add to Home Assistant** handoff after Wi-Fi setup
 
 ## Supported hardware
 
@@ -57,6 +58,62 @@ SCL  ----------------------  GPIO22
 ```
 
 ## Quick installation
+
+### HA Proxy Panel Manager for Windows
+
+Download the standalone Windows manager. It includes ESPHome, so Python is not required:
+
+[Download HA Proxy Panel Manager for Windows](https://github.com/WikiZell/ha-proxy-panel/releases/latest/download/HA-Proxy-Panel-Manager.exe)
+
+Windows may show a SmartScreen warning because this community executable is not code-signed. Verify the SHA256 value published with the GitHub release before running it.
+
+Developers can instead run the manager from source:
+
+```powershell
+python -m pip install -r tools/requirements-windows.txt
+python tools/ha_proxy_panel_flasher.py
+```
+
+The responsive manager uses a clear overview, a selected-device dashboard, a guided configuration and installation workspace, logs, and project information.
+
+- Sign in through Home Assistant's own browser login page, including MFA when enabled.
+- Store the resulting Home Assistant token and device secrets with Windows DPAPI encryption.
+- Detect the connected Windows Wi-Fi network and saved WLAN profiles, then prefill an available saved password without displaying it.
+- Explain whether Wi-Fi came from encrypted app storage, the connected Windows profile, a selected saved profile, or manual entry.
+- Show Home Assistant, Wi-Fi, USB, panel-discovery, sensor, and installation-readiness status at a glance.
+- Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
+- Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, API security, Home Assistant update status, displayed values, climate sources, and Home Assistant entities.
+- Update the selected panel directly from the Devices page using the latest verified GitHub firmware while preserving its identity, sensors, rotation, and existing connection security.
+- Change display content, rotation, brightness, and OLED Care immediately on paired panels.
+- Prepare temperature and humidity source changes for a reviewed OTA update.
+- Restart a paired panel and select it as an OTA update target.
+- Load temperature and humidity entities into editable dropdowns, while still allowing custom entity IDs.
+- Detect USB serial ports and show their adapter descriptions.
+- Validate, flash by USB, or update through the LAN.
+- Download and verify an exact official GitHub firmware commit before every flash or update.
+- Detect a newly provisioned panel and submit its saved API encryption key through Home Assistant's supported config flow.
+- Create or update the selected panel's protected ESPHome Device Builder YAML through Home Assistant ingress, using per-panel secret names.
+- Remove the temporary plaintext `secrets.yaml` after ESPHome finishes.
+- Provide right-click Cut, Copy, Paste, and Select All actions on input fields.
+- Generate an offline phone QR code for the panel fallback Wi-Fi and captive portal.
+
+The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly. A panel does not expose its saved Wi-Fi password. The manager can only reuse its own encrypted setting or a Windows WLAN profile selected by the current user.
+
+Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for the current Windows user. ESPHome build files and downloaded firmware are stored under `%LOCALAPPDATA%\HAProxyPanel` and are not placed in the Git repository.
+
+### Phone setup for a preflashed panel
+
+If the configured home Wi-Fi is unavailable, the panel starts `HA Proxy Panel Fallback` after 30 seconds. The OLED shows a Wi-Fi QR automatically. Scan it with a phone to join the panel network. The responsive setup page lists nearby networks, shows signal quality, supports hidden or manually entered SSIDs, and lets you reveal the password before saving it. After the phone reconnects to home Wi-Fi, choose **Add to Home Assistant**. Home Assistant discovers the ESPHome panel automatically and opens its Integrations page. If the portal does not open automatically, browse to `http://192.168.4.1`.
+
+When using HA Proxy Panel Manager, leave the manager connected to Home Assistant during phone setup. It watches for the newly flashed node, selects it on the Devices page, and enables **Add selected to Home Assistant**. One click sends the matching API encryption key directly from Windows encrypted storage to Home Assistant's supported ESPHome config flow. The key is not shown in the captive portal or uploaded to GitHub.
+
+This first action adds the panel to Home Assistant's core **ESPHome integration**, where its device, entities, controls, and Bluetooth proxy connection are available. Select the panel and choose **Add to Device Builder** to create its maintainable YAML project in the separate ESPHome Device Builder add-on at `/5c53de3b_esphome`. The manager uses a short-lived authenticated ingress session, preserves unrelated Device Builder secrets, refuses to overwrite unmanaged YAML, and does not expose the add-on on the LAN.
+
+Firmware 1.5.0 and later also advertises the official GitHub import package over ESPHome mDNS. Standalone users see an **Adopt** option in Device Builder. Manager users should use **Add to Device Builder** because it transfers the exact saved API key, OTA password, Wi-Fi profile, display defaults, and climate sensor selections automatically.
+
+The same QR is available in the manager under **Overview > Show fallback QR**. This is useful while preparing a preflashed panel or if the small OLED QR is difficult for a phone camera to focus on.
+
+Both QR codes are generated completely offline. Their password is read from the encrypted local panel profile and is not sent to a web service. For manual YAML setup, keep `fallback_ap_qr` in `secrets.yaml` synchronized with `fallback_ap_password`.
 
 ### 1. Download the project
 
@@ -115,7 +172,7 @@ esphome run firmware/ha-proxy-panel.yaml
 
 Select the detected serial port. Windows ports look like `COM10`; Linux ports commonly look like `/dev/ttyUSB0`.
 
-You can also copy the YAML and secrets into the ESPHome Device Builder add-on, validate the configuration, and choose **Install > Plug into this computer**.
+You can also open ESPHome Device Builder and adopt the discovered panel. HA Proxy Panel Manager provides the smoother path because **Add to Device Builder** creates the exact configuration and namespaced secrets automatically.
 
 ### 5. Add it to Home Assistant
 
@@ -129,7 +186,7 @@ If discovery does not appear, choose **Add integration > ESPHome** and enter `ha
 
 ## Home Assistant controls
 
-The ESPHome device page exposes two dropdowns:
+The ESPHome device page exposes display controls and diagnostics:
 
 ### Display Content
 
@@ -144,6 +201,18 @@ The ESPHome device page exposes two dropdowns:
 - **Rotated 180** flips the OLED for upside-down mounting.
 
 Both selections are stored on the ESP32 and survive restarts.
+
+### Display Brightness
+
+Choose 10 to 100 percent. The default is 65 percent and the restored value survives restarts.
+
+### OLED Care
+
+OLED Care is enabled by default. It moves the main content by one safe pixel over time and runs a short full-panel refresh animation every six hours. Use **Run OLED Care Animation** to start it immediately. The animation alternates full black, full white, sweeping columns, and checkerboard patterns so every pixel participates. It cannot reverse permanent OLED wear, but it reduces long-running static patterns.
+
+### Title and firmware notifications
+
+The top row is reserved for the panel title. Titles wider than the available area scroll continuously without entering the Wi-Fi indicator area. The panel checks the official GitHub version file and also reads its Home Assistant ESPHome update entity. A blinking dot announces either update. The bottom tray identifies **PANEL FW UPDATE**, **ESPHOME UPDATE**, or **2 FW UPDATES**. Notification text always enters from below and stays below the separator, so it cannot overlap climate values. Press **Test Firmware Notification** to preview the same animation for 30 seconds. Update with the manager or Device Builder so the panel's identity, sensors, and credentials are preserved.
 
 ## Updating over Wi-Fi
 
@@ -163,9 +232,16 @@ Most installations only need the substitutions at the top of the file.
 | --- | --- | --- |
 | `device_name` | `ha-proxy-panel` | Network hostname and ESPHome node name |
 | `friendly_name` | `HA Proxy Panel` | Name shown in Home Assistant |
-| `display_title` | `HA PROXY PANEL` | OLED header, keep it short |
+| `display_title` | `HA PROXY PANEL` | OLED header; long titles scroll in the reserved top row |
 | `temperature_entity` | example placeholder | Home Assistant temperature entity |
 | `humidity_entity` | example placeholder | Home Assistant humidity entity |
+| `home_assistant_update_entity` | example placeholder | Home Assistant update entity for this ESPHome device |
+| `display_mode_default` | `Climate` | Initial screen content on first boot |
+| `display_rotation_default` | `Rotated 180` | Enclosure-friendly screen orientation on first boot |
+| `display_brightness_default` | `65` | Initial OLED brightness percentage |
+| `oled_care_restore_mode` | `RESTORE_DEFAULT_ON` | Enables OLED Care by default and restores the last selection |
+| `firmware_ref` | `main` | Exact Git ref used for the custom portal component |
+| `firmware_version_url` | official `version.txt` | HTTPS source used for update availability checks |
 | `oled_model` | `SH1106 128x64` | ESPHome display model |
 | `oled_address` | `0x3C` | I2C address |
 | `oled_sda_pin` | `GPIO21` | I2C SDA pin |
@@ -205,9 +281,22 @@ No. The RESET or EN button resets the ESP32 electrically as soon as it is presse
 
 ```text
 firmware/ha-proxy-panel.yaml     ESPHome firmware
+firmware/version.txt             Latest released panel firmware version
 firmware/secrets.example.yaml    Safe configuration template
+firmware/components/panel_portal Modern offline Wi-Fi setup portal
+tools/ha_proxy_panel_flasher.py  Desktop manager launcher
+tools/ha_proxy_panel_app.py      Manager, discovery, security, and flashing logic
+tools/vendor/qrcodegen.py        Bundled offline QR encoder, MIT License
+tools/ha_proxy_panel_manager.spec Standalone Windows executable build definition
+tools/build_windows_exe.ps1      Reproducible Windows executable build script
 docs/                            GitHub Pages website
 .github/workflows/               Firmware validation and Pages deployment
+```
+
+The captive portal source is `firmware/components/panel_portal/portal.html`. After changing it, rebuild the deterministic embedded header with:
+
+```bash
+python firmware/components/panel_portal/generate_portal_header.py
 ```
 
 ## Contributing
@@ -219,3 +308,5 @@ Bug reports and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIB
 HA Proxy Panel is released under the [MIT License](LICENSE).
 
 This is an independent community project. It is not affiliated with or endorsed by Home Assistant, ESPHome, Nabu Casa, or their maintainers.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled dependency notices.

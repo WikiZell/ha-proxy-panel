@@ -4,6 +4,13 @@ substitutions:
   display_title: HA PROXY PANEL
   temperature_entity: sensor.your_temperature_sensor
   humidity_entity: sensor.your_humidity_sensor
+  home_assistant_update_entity: update.your_panel_firmware
+  display_mode_default: Climate
+  display_rotation_default: Rotated 180
+  display_brightness_default: "65"
+  oled_care_restore_mode: RESTORE_DEFAULT_ON
+  firmware_ref: main
+  firmware_version_url: https://raw.githubusercontent.com/WikiZell/ha-proxy-panel/main/firmware/version.txt
   oled_model: SH1106 128x64
   oled_address: "0x3C"
   oled_sda_pin: GPIO21
@@ -13,6 +20,21 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: false
+  project:
+    name: wikizell.ha-proxy-panel
+    version: "1.6.0"
+
+dashboard_import:
+  package_import_url: github://WikiZell/ha-proxy-panel/firmware/ha-proxy-panel.yaml@main
+  import_full_config: false
+
+external_components:
+  - source:
+      type: git
+      url: https://github.com/WikiZell/ha-proxy-panel.git
+      ref: ${firmware_ref}
+      path: firmware/components
+    components: [panel_portal]
 
 esp32:
   board: esp32dev
@@ -22,21 +44,29 @@ esp32:
 logger:
 
 api:
-  encryption:
-    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
-    password: !secret ota_password
+    id: esphome_ota
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   ap:
     ssid: "HA Proxy Panel Fallback"
-    password: !secret fallback_ap_password
+    ap_timeout: 30s
 
 captive_portal:
+
+http_request:
+  useragent: HA-Proxy-Panel/1.6.0
+  timeout: 10s
+  verify_ssl: true
+
+panel_portal:
+
+qr_code:
+  - id: fallback_wifi_qr
+    value: "WIFI:T:nopass;S:HA Proxy Panel Fallback;;"
+    ecc: LOW
 
 i2c:
   id: display_bus
@@ -56,6 +86,21 @@ binary_sensor:
   - platform: status
     id: proxy_status
     name: Status
+
+  - platform: template
+    id: firmware_update_available
+    name: Firmware Update Available
+    entity_category: diagnostic
+    lambda: |-
+      return id(firmware_update_available_flag) ||
+             id(firmware_notification_test_active) ||
+             (id(home_assistant_update_available).has_state() &&
+              id(home_assistant_update_available).state);
+
+  - platform: homeassistant
+    id: home_assistant_update_available
+    entity_id: ${home_assistant_update_entity}
+    internal: true
 
 sensor:
   - platform: wifi_signal
@@ -77,11 +122,63 @@ sensor:
     entity_id: ${humidity_entity}
     internal: true
 
+  - platform: template
+    id: displayed_temperature
+    name: Display Temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      if (id(climate_temperature).has_state()) return id(climate_temperature).state;
+      return NAN;
+
+  - platform: template
+    id: displayed_humidity
+    name: Display Humidity
+    device_class: humidity
+    state_class: measurement
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      if (id(climate_humidity).has_state()) return id(climate_humidity).state;
+      return NAN;
+
 text_sensor:
+  - platform: template
+    id: panel_firmware_version
+    name: Firmware Version
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return {ESPHOME_PROJECT_VERSION};
+
+  - platform: version
+    name: ESPHome Version
+    entity_category: diagnostic
+
   - platform: wifi_info
     ip_address:
       id: ip_address
       name: IP Address
+
+  - platform: template
+    name: Temperature Source
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return {"${temperature_entity}"};
+
+  - platform: template
+    name: Humidity Source
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return {"${humidity_entity}"};
 
 font:
   - file: "gfonts://Roboto Mono"
@@ -91,6 +188,107 @@ font:
   - file: "gfonts://Roboto Mono"
     id: font_big
     size: 20
+
+number:
+  - platform: template
+    id: display_brightness
+    name: Display Brightness
+    icon: mdi:brightness-6
+    entity_category: config
+    min_value: 10
+    max_value: 100
+    step: 5
+    initial_value: ${display_brightness_default}
+    unit_of_measurement: "%"
+    optimistic: true
+    restore_value: true
+    set_action:
+      - lambda: |-
+          id(oled_display).set_contrast(x / 100.0f);
+
+switch:
+  - platform: template
+    id: oled_care_enabled
+    name: OLED Care
+    icon: mdi:shield-sun
+    entity_category: config
+    optimistic: true
+    restore_mode: ${oled_care_restore_mode}
+
+globals:
+  - id: oled_care_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: oled_care_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: firmware_update_available_flag
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: latest_firmware_version
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+  - id: firmware_notification_test_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+script:
+  - id: run_oled_care_animation
+    mode: restart
+    then:
+      - lambda: |-
+          id(oled_care_active) = true;
+          id(oled_care_frame) = 0;
+      - repeat:
+          count: 28
+          then:
+            - component.update: oled_display
+            - delay: 180ms
+            - lambda: |-
+                id(oled_care_frame) += 1;
+      - lambda: |-
+          id(oled_care_active) = false;
+      - component.update: oled_display
+
+interval:
+  - interval: 6h
+    then:
+      - if:
+          condition:
+            switch.is_on: oled_care_enabled
+          then:
+            - script.execute: run_oled_care_animation
+  - interval: 6h
+    startup_delay: 30s
+    then:
+      - http_request.get:
+          url: ${firmware_version_url}
+          capture_response: true
+          max_response_buffer_size: 64
+          on_response:
+            then:
+              - lambda: |-
+                  std::string latest = body;
+                  while (!latest.empty() &&
+                         (latest.back() == '\r' || latest.back() == '\n' || latest.back() == ' '))
+                    latest.pop_back();
+                  int latest_major = 0, latest_minor = 0, latest_patch = 0;
+                  int current_major = 0, current_minor = 0, current_patch = 0;
+                  const bool latest_valid =
+                      sscanf(latest.c_str(), "%d.%d.%d", &latest_major, &latest_minor, &latest_patch) == 3;
+                  const bool current_valid =
+                      sscanf(ESPHOME_PROJECT_VERSION, "%d.%d.%d", &current_major, &current_minor, &current_patch) == 3;
+                  const int latest_code = latest_major * 1000000 + latest_minor * 1000 + latest_patch;
+                  const int current_code = current_major * 1000000 + current_minor * 1000 + current_patch;
+                  if (latest_valid && current_valid) {
+                    id(latest_firmware_version) = latest;
+                    id(firmware_update_available_flag) = latest_code > current_code;
+                  }
 
 select:
   - platform: template
@@ -103,7 +301,7 @@ select:
       - Temperature
       - Humidity
       - Proxy Status
-    initial_option: Climate
+    initial_option: ${display_mode_default}
     optimistic: true
     restore_value: true
 
@@ -115,7 +313,7 @@ select:
     options:
       - Normal
       - Rotated 180
-    initial_option: Normal
+    initial_option: ${display_rotation_default}
     optimistic: true
     restore_value: true
 
@@ -125,7 +323,7 @@ display:
     model: "${oled_model}"
     address: ${oled_address}
     rotation: 0
-    update_interval: 5s
+    update_interval: 250ms
     lambda: |-
       // Use the OLED controller for rotation. This avoids a one-column wrap
       // seen on some CH1115 panels when the framebuffer is rotated in software.
@@ -144,8 +342,86 @@ display:
         rotation_initialized = true;
       }
 
-      // Header and Wi-Fi indicator.
-      it.printf(0, 0, id(font_small), "${display_title}");
+      // Apply restored brightness after the display and template number are ready.
+      static float applied_brightness = -1.0f;
+      if (id(display_brightness).has_state() &&
+          fabsf(id(display_brightness).state - applied_brightness) > 0.1f) {
+        id(oled_display).set_contrast(id(display_brightness).state / 100.0f);
+        applied_brightness = id(display_brightness).state;
+      }
+
+      // OLED care deliberately exercises every pixel, then sweeps alternating
+      // patterns across the panel. It can be launched from Home Assistant and
+      // also runs every six hours while OLED Care is enabled.
+      if (id(oled_care_active)) {
+        const int frame = id(oled_care_frame);
+        if (frame < 3) {
+          it.fill(COLOR_OFF);
+        } else if (frame < 6) {
+          it.fill(COLOR_ON);
+        } else if (frame < 14) {
+          it.fill(COLOR_OFF);
+          const int sweep_x = (frame - 6) * 16;
+          it.filled_rectangle(sweep_x, 0, 16, 64);
+        } else if (frame < 22) {
+          it.fill(COLOR_ON);
+          const int sweep_x = (frame - 14) * 16;
+          it.filled_rectangle(sweep_x, 0, 16, 64, COLOR_OFF);
+        } else {
+          it.fill(COLOR_OFF);
+          const int phase = frame & 1;
+          for (int y = 0; y < 64; y += 4) {
+            for (int x = 0; x < 128; x += 4) {
+              if ((((x / 4) + (y / 4) + phase) & 1) == 0)
+                it.filled_rectangle(x, y, 4, 4);
+            }
+          }
+        }
+        return;
+      }
+
+      // A preflashed panel that cannot join Wi-Fi becomes its own setup
+      // network after 30 seconds. Show a scannable Wi-Fi QR directly on the
+      // OLED so first-time setup only needs a phone.
+      if (!wifi::global_wifi_component->is_connected()) {
+        const int qr_size = id(fallback_wifi_qr).get_size();
+        const int qr_x = 5;
+        const int qr_y = (64 - qr_size) / 2;
+        it.filled_rectangle(qr_x - 2, qr_y - 2, qr_size + 4, qr_size + 4);
+        it.qr_code(qr_x, qr_y, id(fallback_wifi_qr), COLOR_OFF, 1);
+        it.printf(46, 4, id(font_small), "SETUP WIFI");
+        it.printf(46, 17, id(font_small), "SCAN QR");
+        it.printf(46, 32, id(font_small), "HA PROXY");
+        it.printf(46, 44, id(font_small), "PANEL AP");
+        return;
+      }
+
+      // The title owns x=0..107. Long titles scroll smoothly while the Wi-Fi
+      // and update indicators retain a fixed, readable area on the right.
+      const std::string title = "${display_title}";
+      int title_x1, title_y1, title_width, title_height;
+      it.get_text_bounds(0, 0, title.c_str(), id(font_small),
+                         TextAlign::TOP_LEFT, &title_x1, &title_y1,
+                         &title_width, &title_height);
+      if (title_width <= 106) {
+        it.printf(0, 0, id(font_small), "%s", title.c_str());
+      } else {
+        const int title_gap = 18;
+        const int title_cycle = title_width + title_gap;
+        const int title_scroll = (millis() / 90) % title_cycle;
+        it.printf(-title_scroll, 0, id(font_small), "%s", title.c_str());
+        it.printf(title_cycle - title_scroll, 0, id(font_small), "%s", title.c_str());
+      }
+      it.filled_rectangle(107, 0, 21, 12, COLOR_OFF);
+      const bool panel_update_available = id(firmware_update_available_flag);
+      const bool esphome_update_available =
+          id(home_assistant_update_available).has_state() &&
+          id(home_assistant_update_available).state;
+      const bool update_available = panel_update_available ||
+                                    esphome_update_available ||
+                                    id(firmware_notification_test_active);
+      if (update_available && ((millis() / 500) & 1))
+        it.filled_rectangle(107, 2, 3, 3);
       if (id(wifi_rssi).has_state()) {
         int wifi_bars = 1;
         if (id(wifi_rssi).state > -75) wifi_bars = 2;
@@ -165,61 +441,115 @@ display:
       it.line(0, 12, 127, 12);
 
       const std::string mode = id(display_content).current_option();
+      const int care_phase = id(oled_care_enabled).state ? ((millis() / 60000) % 4) : 0;
+      const int content_shift_x = care_phase == 1 || care_phase == 2 ? 1 : 0;
+      const int content_shift_y = care_phase >= 2 ? 1 : 0;
       if (mode == "Temperature") {
-        it.printf(0, 15, id(font_small), "TEMPERATURE");
+        it.printf(content_shift_x, 15 + content_shift_y, id(font_small), "TEMPERATURE");
         if (id(climate_temperature).has_state()) {
-          it.printf(18, 24, id(font_big), "%.1f", id(climate_temperature).state);
-          it.circle(76, 28, 2);
-          it.printf(82, 30, id(font_small), "C");
+          it.printf(18 + content_shift_x, 22 + content_shift_y, id(font_big), "%.1f", id(climate_temperature).state);
+          it.circle(76 + content_shift_x, 27 + content_shift_y, 2);
+          it.printf(82 + content_shift_x, 28 + content_shift_y, id(font_small), "C");
         } else {
-          it.printf(32, 24, id(font_big), "--.-");
+          it.printf(32 + content_shift_x, 22 + content_shift_y, id(font_big), "--.-");
         }
       } else if (mode == "Humidity") {
-        it.printf(0, 15, id(font_small), "HUMIDITY");
+        it.printf(content_shift_x, 15 + content_shift_y, id(font_small), "HUMIDITY");
         if (id(climate_humidity).has_state()) {
-          it.printf(34, 24, id(font_big), "%.0f%%", id(climate_humidity).state);
+          it.printf(34 + content_shift_x, 22 + content_shift_y, id(font_big), "%.0f%%", id(climate_humidity).state);
         } else {
-          it.printf(40, 24, id(font_big), "--%%");
+          it.printf(40 + content_shift_x, 22 + content_shift_y, id(font_big), "--%%");
         }
       } else if (mode == "Proxy Status") {
         if (id(wifi_rssi).has_state()) {
-          it.printf(0, 15, id(font_small), "WIFI: %.0f dBm", id(wifi_rssi).state);
+          it.printf(content_shift_x, 15 + content_shift_y, id(font_small), "WIFI: %.0f dBm", id(wifi_rssi).state);
         } else {
-          it.printf(0, 15, id(font_small), "WIFI: -- dBm");
+          it.printf(content_shift_x, 15 + content_shift_y, id(font_small), "WIFI: -- dBm");
         }
-        it.printf(0, 26, id(font_small), "IP: %s", id(ip_address).state.c_str());
+        it.printf(content_shift_x, 26 + content_shift_y, id(font_small), "IP: %s", id(ip_address).state.c_str());
         if (id(proxy_uptime).has_state()) {
-          it.printf(0, 37, id(font_small), "UP: %.1f hours", id(proxy_uptime).state / 3600.0f);
+          it.printf(content_shift_x, 37 + content_shift_y, id(font_small), "UP: %.1f hours", id(proxy_uptime).state / 3600.0f);
         }
       } else {
-        it.line(64, 14, 64, 47);
-        it.printf(0, 14, id(font_small), "T:");
+        it.line(64 + content_shift_x, 14 + content_shift_y, 64 + content_shift_x, 47);
+        it.printf(content_shift_x, 14 + content_shift_y, id(font_small), "T:");
         if (id(climate_temperature).has_state()) {
-          it.printf(0, 22, id(font_big), "%.1f", id(climate_temperature).state);
-          it.circle(50, 27, 2);
-          it.printf(54, 28, id(font_small), "C");
+          it.printf(content_shift_x, 22 + content_shift_y, id(font_big), "%.1f", id(climate_temperature).state);
+          it.circle(50 + content_shift_x, 27 + content_shift_y, 2);
+          it.printf(54 + content_shift_x, 28 + content_shift_y, id(font_small), "C");
         } else {
-          it.printf(0, 22, id(font_big), "--.-");
+          it.printf(content_shift_x, 22 + content_shift_y, id(font_big), "--.-");
         }
 
-        it.printf(70, 14, id(font_small), "H:");
+        it.printf(70 + content_shift_x, 14 + content_shift_y, id(font_small), "H:");
         if (id(climate_humidity).has_state()) {
-          it.printf(70, 22, id(font_big), "%.0f%%", id(climate_humidity).state);
+          it.printf(70 + content_shift_x, 22 + content_shift_y, id(font_big), "%.0f%%", id(climate_humidity).state);
         } else {
-          it.printf(70, 22, id(font_big), "--%%");
+          it.printf(70 + content_shift_x, 22 + content_shift_y, id(font_big), "--%%");
         }
       }
 
-      // Footer with proxy and climate-data availability.
+      // The bottom row becomes a notification tray. Messages only enter from
+      // below and are never drawn above the separator, so they cannot overlap
+      // climate values or the normal proxy-status text.
       it.line(0, 48, 127, 48);
-      it.printf(0, 52, id(font_small), "BT");
       const bool climate_available =
           id(climate_temperature).has_state() || id(climate_humidity).has_state();
-      it.printf(15, 52, id(font_small), "PROXY %s DATA %s",
+      int normal_footer_y = 52;
+      int update_footer_y = 66;
+      bool show_update_footer = false;
+      if (update_available) {
+        const int footer_phase = millis() % 20000;
+        if (footer_phase < 1000) {
+          const int slide = (footer_phase * 14) / 1000;
+          normal_footer_y = 66;
+          update_footer_y = 66 - slide;
+          show_update_footer = true;
+        } else if (footer_phase < 7000) {
+          normal_footer_y = 66;
+          update_footer_y = 52;
+          show_update_footer = true;
+        } else if (footer_phase < 8000) {
+          const int slide = ((footer_phase - 7000) * 14) / 1000;
+          normal_footer_y = 66 - slide;
+          show_update_footer = false;
+        }
+      }
+      it.printf(0, normal_footer_y, id(font_small), "BT PROXY %s DATA %s",
                 id(proxy_status).state ? "ON" : "OFF",
                 climate_available ? "OK" : "--");
+      if (show_update_footer) {
+        const char *update_text = "TEST FW UPDATE";
+        if (panel_update_available && esphome_update_available)
+          update_text = "2 FW UPDATES";
+        else if (panel_update_available)
+          update_text = "PANEL FW UPDATE";
+        else if (esphome_update_available)
+          update_text = "ESPHOME UPDATE";
+        it.printf(12, update_footer_y, id(font_small), "%s", update_text);
+      }
 
 button:
+  - platform: template
+    id: run_oled_care
+    name: Run OLED Care Animation
+    icon: mdi:animation-play
+    entity_category: config
+    on_press:
+      - script.execute: run_oled_care_animation
+
+  - platform: template
+    id: test_firmware_notification
+    name: Test Firmware Notification
+    icon: mdi:message-badge-outline
+    entity_category: diagnostic
+    on_press:
+      - lambda: |-
+          id(firmware_notification_test_active) = true;
+      - delay: 30s
+      - lambda: |-
+          id(firmware_notification_test_active) = false;
+
   - platform: restart
     name: Restart
     entity_category: diagnostic

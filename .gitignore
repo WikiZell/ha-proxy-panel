@@ -1,5 +1,7 @@
 .esphome/
+firmware/.esphome/
 build/
+dist/
 firmware/secrets.yaml
 *.bin
 *.elf
@@ -8,3 +10,5 @@ Thumbs.db
 node_modules/
 playwright-report/
 test-results/
+__pycache__/
+*.pyc
