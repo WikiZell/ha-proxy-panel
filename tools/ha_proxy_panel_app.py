@@ -369,7 +369,57 @@ class HomeAssistantClient:
                 },
             ))
         self._device_builder_commands(session, ingress, commands)
-        return {"status": "updated" if existing else "created", "configuration": configuration}
+        self._validate_device_builder_project(session, ingress, configuration)
+        return {
+            "status": "updated" if existing else "created",
+            "configuration": configuration,
+            "validation": "passed",
+        }
+
+    def _validate_device_builder_project(
+        self,
+        session: str,
+        ingress: str,
+        configuration: str,
+    ) -> None:
+        """Require Device Builder's own ESPHome validation before reporting success."""
+        try:
+            import websocket
+        except ImportError as exc:
+            raise RuntimeError("Device Builder setup needs websocket-client, included with ESPHome.") from exc
+        parsed = urllib.parse.urlsplit(self.base_url)
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        ingress_path = "/" + ingress.strip("/") + "/ws"
+        ws_url = urllib.parse.urlunsplit((scheme, parsed.netloc, ingress_path, "", ""))
+        connection = websocket.create_connection(
+            ws_url,
+            header=[f"Cookie: ingress_session={session}"],
+            timeout=180,
+        )
+        try:
+            hello = json.loads(connection.recv())
+            if "server_version" not in hello:
+                raise RuntimeError("Device Builder did not complete its validation handshake.")
+            connection.send(json.dumps({
+                "command": "devices/validate",
+                "message_id": "1",
+                "args": {"configuration": configuration},
+            }))
+            while True:
+                response = json.loads(connection.recv())
+                if response.get("message_id") != "1":
+                    continue
+                if "error_code" in response:
+                    raise RuntimeError("Device Builder could not start project validation.")
+                if response.get("event") == "result":
+                    result = response.get("data")
+                    if not isinstance(result, dict) or not result.get("success"):
+                        raise RuntimeError(
+                            "Device Builder saved the project, but ESPHome configuration validation failed."
+                        )
+                    return
+        finally:
+            connection.close()
 
     def _device_builder_commands(
         self,
