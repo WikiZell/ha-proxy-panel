@@ -17,7 +17,13 @@ esphome:
   name_add_mac_suffix: false
   project:
     name: wikizell.ha-proxy-panel
-    version: "1.2.0"
+    version: "1.3.0"
+
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [panel_portal]
 
 esp32:
   board: esp32dev
@@ -43,6 +49,8 @@ wifi:
     ap_timeout: 30s
 
 captive_portal:
+
+panel_portal:
 
 qr_code:
   - id: fallback_wifi_qr

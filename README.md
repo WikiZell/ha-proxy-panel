@@ -93,7 +93,7 @@ Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for th
 
 ### Phone setup for a preflashed panel
 
-If the configured home Wi-Fi is unavailable, the panel starts `HA Proxy Panel Fallback` after 30 seconds. The OLED shows a Wi-Fi QR automatically. Scan it with a phone to join the panel network, then choose the home Wi-Fi in the captive portal. If the portal does not open automatically, browse to `http://192.168.4.1`.
+If the configured home Wi-Fi is unavailable, the panel starts `HA Proxy Panel Fallback` after 30 seconds. The OLED shows a Wi-Fi QR automatically. Scan it with a phone to join the panel network. The responsive setup page lists nearby networks, shows signal quality, supports hidden or manually entered SSIDs, and lets you reveal the password before saving it. If the portal does not open automatically, browse to `http://192.168.4.1`.
 
 The same QR is available in the manager under **Overview > Show fallback QR**. This is useful while preparing a preflashed panel or if the small OLED QR is difficult for a phone camera to focus on.
 
@@ -249,11 +249,18 @@ No. The RESET or EN button resets the ESP32 electrically as soon as it is presse
 ```text
 firmware/ha-proxy-panel.yaml     ESPHome firmware
 firmware/secrets.example.yaml    Safe configuration template
+firmware/components/panel_portal Modern offline Wi-Fi setup portal
 tools/ha_proxy_panel_flasher.py  Desktop manager launcher
 tools/ha_proxy_panel_app.py      Manager, discovery, security, and flashing logic
 tools/vendor/qrcodegen.py        Bundled offline QR encoder, MIT License
 docs/                            GitHub Pages website
 .github/workflows/               Firmware validation and Pages deployment
+```
+
+The captive portal source is `firmware/components/panel_portal/portal.html`. After changing it, rebuild the deterministic embedded header with:
+
+```bash
+python firmware/components/panel_portal/generate_portal_header.py
 ```
 
 ## Contributing
