@@ -3,13 +3,14 @@
 from PyInstaller.utils.hooks import collect_all
 
 esphome_datas, esphome_binaries, esphome_hiddenimports = collect_all("esphome")
+glyph_datas, glyph_binaries, glyph_hiddenimports = collect_all("esphome_glyphsets")
 
 a = Analysis(
     ["ha_proxy_panel_flasher.py"],
     pathex=["."],
-    binaries=esphome_binaries,
-    datas=esphome_datas,
-    hiddenimports=esphome_hiddenimports,
+    binaries=esphome_binaries + glyph_binaries,
+    datas=esphome_datas + glyph_datas,
+    hiddenimports=esphome_hiddenimports + glyph_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
