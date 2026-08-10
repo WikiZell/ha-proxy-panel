@@ -16,6 +16,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Install desktop GUI dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes python3-tk
+
       - name: Validate manager and tests
         run: |
           python -m py_compile tools/ha_proxy_panel_app.py tools/ha_proxy_panel_flasher.py

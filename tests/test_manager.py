@@ -38,10 +38,10 @@ class HomeAssistantConfigFlowTests(unittest.TestCase):
             {"type": "create_entry", "title": "1st Floor Bluetooth Proxy"},
         ])
 
-        result = client.add_esphome("192.168.1.75", "secure-api-key")
+        result = client.add_esphome("192.0.2.75", "secure-api-key")
 
         self.assertEqual(result["status"], "added")
-        self.assertEqual(client.calls[1][1], {"host": "192.168.1.75", "port": 6053})
+        self.assertEqual(client.calls[1][1], {"host": "192.0.2.75", "port": 6053})
         self.assertEqual(client.calls[2][1], {"noise_psk": "secure-api-key"})
 
     def test_accepts_key_already_known_by_home_assistant(self) -> None:
@@ -61,7 +61,7 @@ class HomeAssistantConfigFlowTests(unittest.TestCase):
             {"type": "abort", "reason": "already_configured"},
         ])
 
-        result = client.add_esphome("192.168.1.75", "secure-api-key")
+        result = client.add_esphome("192.0.2.75", "secure-api-key")
 
         self.assertEqual(result["status"], "already_configured")
 
@@ -71,7 +71,7 @@ class HomeAssistantConfigFlowTests(unittest.TestCase):
             {"type": "abort", "reason": "already_configured_updates"},
         ])
 
-        result = client.add_esphome("192.168.1.61", "secure-api-key")
+        result = client.add_esphome("198.51.100.61", "secure-api-key")
 
         self.assertEqual(result["status"], "already_configured")
 
@@ -83,7 +83,7 @@ class HomeAssistantConfigFlowTests(unittest.TestCase):
         ])
 
         with self.assertRaisesRegex(RuntimeError, "does not match"):
-            client.add_esphome("192.168.1.75", "wrong-key")
+            client.add_esphome("192.0.2.75", "wrong-key")
 
 
 class DeviceBuilderProjectTests(unittest.TestCase):
