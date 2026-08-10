@@ -5,7 +5,7 @@ substitutions:
   temperature_entity: sensor.your_temperature_sensor
   humidity_entity: sensor.your_humidity_sensor
   display_mode_default: Climate
-  display_rotation_default: Normal
+  display_rotation_default: Rotated 180
   oled_model: SH1106 128x64
   oled_address: "0x3C"
   oled_sda_pin: GPIO21
@@ -17,7 +17,7 @@ esphome:
   name_add_mac_suffix: false
   project:
     name: wikizell.ha-proxy-panel
-    version: "1.1.0"
+    version: "1.2.0"
 
 esp32:
   board: esp32dev

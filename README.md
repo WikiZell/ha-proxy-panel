@@ -67,10 +67,13 @@ python -m pip install esphome
 python tools/ha_proxy_panel_flasher.py
 ```
 
-The application separates initial setup, device management, flashing, logs, and project information into individual tabs.
+The responsive manager uses a clear overview, a selected-device dashboard, a guided configuration and installation workspace, logs, and project information.
 
 - Sign in through Home Assistant's own browser login page, including MFA when enabled.
 - Store the resulting Home Assistant token and device secrets with Windows DPAPI encryption.
+- Detect the connected Windows Wi-Fi network and saved WLAN profiles, then prefill an available saved password without displaying it.
+- Explain whether Wi-Fi came from encrypted app storage, the connected Windows profile, a selected saved profile, or manual entry.
+- Show Home Assistant, Wi-Fi, USB, panel-discovery, sensor, and installation-readiness status at a glance.
 - Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
 - Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, displayed values, climate sources, and Home Assistant entities.
 - Change display content and rotation immediately on paired panels.
@@ -84,7 +87,7 @@ The application separates initial setup, device management, flashing, logs, and 
 - Provide right-click Cut, Copy, Paste, and Select All actions on input fields.
 - Generate an offline phone QR code for the panel fallback Wi-Fi and captive portal.
 
-The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly.
+The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly. A panel does not expose its saved Wi-Fi password. The manager can only reuse its own encrypted setting or a Windows WLAN profile selected by the current user.
 
 Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for the current Windows user. ESPHome build files and downloaded firmware are stored under `%LOCALAPPDATA%\HAProxyPanel` and are not placed in the Git repository.
 
@@ -92,7 +95,7 @@ Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for th
 
 If the configured home Wi-Fi is unavailable, the panel starts `HA Proxy Panel Fallback` after 30 seconds. The OLED shows a Wi-Fi QR automatically. Scan it with a phone to join the panel network, then choose the home Wi-Fi in the captive portal. If the portal does not open automatically, browse to `http://192.168.4.1`.
 
-The same QR is available in the manager under **Setup > Show phone setup QR**. This is useful while preparing a preflashed panel or if the small OLED QR is difficult for a phone camera to focus on.
+The same QR is available in the manager under **Overview > Show fallback QR**. This is useful while preparing a preflashed panel or if the small OLED QR is difficult for a phone camera to focus on.
 
 Both QR codes are generated completely offline. Their password is read from the encrypted local panel profile and is not sent to a web service. For manual YAML setup, keep `fallback_ap_qr` in `secrets.yaml` synchronized with `fallback_ap_password`.
 
@@ -205,7 +208,7 @@ Most installations only need the substitutions at the top of the file.
 | `temperature_entity` | example placeholder | Home Assistant temperature entity |
 | `humidity_entity` | example placeholder | Home Assistant humidity entity |
 | `display_mode_default` | `Climate` | Initial screen content on first boot |
-| `display_rotation_default` | `Normal` | Initial screen orientation on first boot |
+| `display_rotation_default` | `Rotated 180` | Enclosure-friendly screen orientation on first boot |
 | `oled_model` | `SH1106 128x64` | ESPHome display model |
 | `oled_address` | `0x3C` | I2C address |
 | `oled_sda_pin` | `GPIO21` | I2C SDA pin |
