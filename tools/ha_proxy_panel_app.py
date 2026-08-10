@@ -130,7 +130,7 @@ api:
 
 ota:
   - platform: esphome
-    id: esphome_ota
+    id: !extend esphome_ota
     password: !secret {secret_names['ota_password']}
 
 wifi:
@@ -140,7 +140,7 @@ wifi:
     password: !secret {secret_names['fallback_ap_password']}
 
 qr_code:
-  - id: fallback_wifi_qr
+  - id: !extend fallback_wifi_qr
     value: !secret {secret_names['fallback_ap_qr']}
 """
     secrets_update = {secret_names[key]: values[key] for key in secret_names}
@@ -1763,7 +1763,32 @@ class ProxyPanelApp(tk.Tk):
             )
             substitutions = "\n".join(f"  {k}: {yaml_string(values[k])}" for k in substitution_keys)
             substitutions += f"\n  firmware_ref: {yaml_string(sha)}"
-            (work / "device.yaml").write_text(f"substitutions:\n{substitutions}\n\npackages:\n  panel: !include ha-proxy-panel-base.yaml\n", encoding="utf-8")
+            secure_overrides = """
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    id: !extend esphome_ota
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    password: !secret fallback_ap_password
+
+qr_code:
+  - id: !extend fallback_wifi_qr
+    value: !secret fallback_ap_qr
+"""
+            (work / "device.yaml").write_text(
+                f"substitutions:\n{substitutions}\n\npackages:\n  panel: !include ha-proxy-panel-base.yaml\n"
+                + secure_overrides,
+                encoding="utf-8",
+            )
             secrets_path.write_text("\n".join(f"{k}: {yaml_string(values[k])}" for k in ("wifi_ssid", "wifi_password", "api_encryption_key", "ota_password", "fallback_ap_password", "fallback_ap_qr")) + "\n", encoding="utf-8")
             command = esphome_command() + (["config"] if mode == "config" else ["run", "--no-logs"]) + [str(work / "device.yaml")]
             if device: command += ["--device", device]

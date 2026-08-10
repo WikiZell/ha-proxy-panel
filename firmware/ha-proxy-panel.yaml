@@ -43,20 +43,14 @@ esp32:
 logger:
 
 api:
-  encryption:
-    key: !secret api_encryption_key
 
 ota:
   - platform: esphome
     id: esphome_ota
-    password: !secret ota_password
 
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
   ap:
     ssid: "HA Proxy Panel Fallback"
-    password: !secret fallback_ap_password
     ap_timeout: 30s
 
 captive_portal:
@@ -70,7 +64,7 @@ panel_portal:
 
 qr_code:
   - id: fallback_wifi_qr
-    value: !secret fallback_ap_qr
+    value: "WIFI:T:nopass;S:HA Proxy Panel Fallback;;"
     ecc: LOW
 
 i2c:

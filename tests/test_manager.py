@@ -137,7 +137,7 @@ packages:
         project, secrets_update = device_builder_project(values, "abc123")
 
         self.assertIn("# Managed by HA Proxy Panel Manager", project)
-        self.assertIn("hpp_first_floor_bluetooth_proxy_api_encryption_key", project)
+        self.assertIn("key: !secret hpp_first_floor_bluetooth_proxy_api_encryption_key", project)
         self.assertNotIn("private-api-key", project)
         self.assertNotIn("private-wifi-password", project)
         self.assertEqual(
