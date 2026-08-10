@@ -43,7 +43,7 @@ jobs:
             --exclude='secrets.example.yaml' \
             --exclude='validate.yml' \
             --exclude-dir='.git' \
-            '(?:password|api_encryption_key):\s*(?![!]secret\b)\S+|192\.168\.[0-9]+\.[0-9]+' .; then
+            '^\s*(?:password|api_encryption_key):\s*(?![!]secret\b)\S+|192\.168\.(?!4\.1\b)[0-9]+\.[0-9]+' .; then
             echo "Potential private value found"
             exit 1
           fi

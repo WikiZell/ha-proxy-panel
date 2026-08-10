@@ -17,7 +17,7 @@ esphome:
   name_add_mac_suffix: false
   project:
     name: wikizell.ha-proxy-panel
-    version: "1.0.0"
+    version: "1.1.0"
 
 esp32:
   board: esp32dev
@@ -40,8 +40,14 @@ wifi:
   ap:
     ssid: "HA Proxy Panel Fallback"
     password: !secret fallback_ap_password
+    ap_timeout: 30s
 
 captive_portal:
+
+qr_code:
+  - id: fallback_wifi_qr
+    value: !secret fallback_ap_qr
+    ecc: LOW
 
 i2c:
   id: display_bus
@@ -82,11 +88,55 @@ sensor:
     entity_id: ${humidity_entity}
     internal: true
 
+  - platform: template
+    id: displayed_temperature
+    name: Display Temperature
+    device_class: temperature
+    state_class: measurement
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      if (id(climate_temperature).has_state()) return id(climate_temperature).state;
+      return NAN;
+
+  - platform: template
+    id: displayed_humidity
+    name: Display Humidity
+    device_class: humidity
+    state_class: measurement
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    entity_category: diagnostic
+    update_interval: 10s
+    lambda: |-
+      if (id(climate_humidity).has_state()) return id(climate_humidity).state;
+      return NAN;
+
 text_sensor:
+  - platform: version
+    name: Firmware Version
+    entity_category: diagnostic
+
   - platform: wifi_info
     ip_address:
       id: ip_address
       name: IP Address
+
+  - platform: template
+    name: Temperature Source
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return {"${temperature_entity}"};
+
+  - platform: template
+    name: Humidity Source
+    entity_category: diagnostic
+    update_interval: 60s
+    lambda: |-
+      return {"${humidity_entity}"};
 
 font:
   - file: "gfonts://Roboto Mono"
@@ -147,6 +197,22 @@ display:
         id(display_bus).write(${oled_address}, com_scan, sizeof(com_scan));
         rotation_180 = requested_rotation_180;
         rotation_initialized = true;
+      }
+
+      // A preflashed panel that cannot join Wi-Fi becomes its own setup
+      // network after 30 seconds. Show a scannable Wi-Fi QR directly on the
+      // OLED so first-time setup only needs a phone.
+      if (!wifi::global_wifi_component->is_connected()) {
+        const int qr_size = id(fallback_wifi_qr).get_size();
+        const int qr_x = 5;
+        const int qr_y = (64 - qr_size) / 2;
+        it.filled_rectangle(qr_x - 2, qr_y - 2, qr_size + 4, qr_size + 4);
+        it.qr_code(qr_x, qr_y, id(fallback_wifi_qr), COLOR_OFF, 1);
+        it.printf(46, 4, id(font_small), "SETUP WIFI");
+        it.printf(46, 17, id(font_small), "SCAN QR");
+        it.printf(46, 32, id(font_small), "HA PROXY");
+        it.printf(46, 44, id(font_small), "PANEL AP");
+        return;
       }
 
       // Header and Wi-Fi indicator.

@@ -16,7 +16,7 @@ HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assista
 - Wi-Fi strength, IP address, uptime, proxy state, and data availability
 - CH1115 edge-wrap correction when used in SH1106 compatibility mode
 - Safe encrypted Home Assistant API and password-protected OTA updates
-- Captive-portal fallback when normal Wi-Fi is unavailable
+- Captive-portal fallback with an on-screen Wi-Fi QR when normal Wi-Fi is unavailable
 
 ## Supported hardware
 
@@ -72,7 +72,9 @@ The application separates initial setup, device management, flashing, logs, and 
 - Sign in through Home Assistant's own browser login page, including MFA when enabled.
 - Store the resulting Home Assistant token and device secrets with Windows DPAPI encryption.
 - Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
+- Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, displayed values, climate sources, and Home Assistant entities.
 - Change display content and rotation immediately on paired panels.
+- Prepare temperature and humidity source changes for a reviewed OTA update.
 - Restart a paired panel and select it as an OTA update target.
 - Load temperature and humidity entities into editable dropdowns, while still allowing custom entity IDs.
 - Detect USB serial ports and show their adapter descriptions.
@@ -80,10 +82,19 @@ The application separates initial setup, device management, flashing, logs, and 
 - Download and verify an exact official GitHub firmware commit before every flash or update.
 - Remove the temporary plaintext `secrets.yaml` after ESPHome finishes.
 - Provide right-click Cut, Copy, Paste, and Select All actions on input fields.
+- Generate an offline phone QR code for the panel fallback Wi-Fi and captive portal.
 
 The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly.
 
 Saved secrets are encrypted into `%LOCALAPPDATA%\HAProxyPanel\secure.bin` for the current Windows user. ESPHome build files and downloaded firmware are stored under `%LOCALAPPDATA%\HAProxyPanel` and are not placed in the Git repository.
+
+### Phone setup for a preflashed panel
+
+If the configured home Wi-Fi is unavailable, the panel starts `HA Proxy Panel Fallback` after 30 seconds. The OLED shows a Wi-Fi QR automatically. Scan it with a phone to join the panel network, then choose the home Wi-Fi in the captive portal. If the portal does not open automatically, browse to `http://192.168.4.1`.
+
+The same QR is available in the manager under **Setup > Show phone setup QR**. This is useful while preparing a preflashed panel or if the small OLED QR is difficult for a phone camera to focus on.
+
+Both QR codes are generated completely offline. Their password is read from the encrypted local panel profile and is not sent to a web service. For manual YAML setup, keep `fallback_ap_qr` in `secrets.yaml` synchronized with `fallback_ap_password`.
 
 ### 1. Download the project
 
@@ -237,6 +248,7 @@ firmware/ha-proxy-panel.yaml     ESPHome firmware
 firmware/secrets.example.yaml    Safe configuration template
 tools/ha_proxy_panel_flasher.py  Desktop manager launcher
 tools/ha_proxy_panel_app.py      Manager, discovery, security, and flashing logic
+tools/vendor/qrcodegen.py        Bundled offline QR encoder, MIT License
 docs/                            GitHub Pages website
 .github/workflows/               Firmware validation and Pages deployment
 ```
@@ -250,3 +262,5 @@ Bug reports and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIB
 HA Proxy Panel is released under the [MIT License](LICENSE).
 
 This is an independent community project. It is not affiliated with or endorsed by Home Assistant, ESPHome, Nabu Casa, or their maintainers.
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for bundled dependency notices.

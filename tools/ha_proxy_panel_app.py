@@ -26,9 +26,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
+from vendor.qrcodegen import QrCode
 
 
 APP_NAME = "HA Proxy Panel"
+APP_VERSION = "1.1.0"
 APP_ROOT = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "HAProxyPanel"
 SETTINGS_FILE = APP_ROOT / "settings.json"
 SECURE_FILE = APP_ROOT / "secure.bin"
@@ -177,6 +179,7 @@ class Panel:
     signal: str = ""
     entities: dict[str, str] = field(default_factory=dict)
     values: dict[str, str] = field(default_factory=dict)
+    node_name: str = ""
 
 
 def esphome_command() -> list[str]:
@@ -236,6 +239,8 @@ class ProxyPanelApp(tk.Tk):
         self._install_edit_bindings()
         self.after(100, self._drain_queues)
         self.after(250, self.detect_ports)
+        if self.ha_token.get().strip() or self.ha_refresh_token:
+            self.after(700, self.connect_home_assistant)
 
     @staticmethod
     def _load_json(path: Path) -> dict[str, object]:
@@ -306,6 +311,20 @@ class ProxyPanelApp(tk.Tk):
             wraplength=800,
             justify="left",
         ).grid(row=row, column=0, columnspan=3, sticky="w", pady=8)
+        row += 1
+        onboarding = ttk.LabelFrame(tab, text="Phone setup for a preflashed panel", padding=12)
+        onboarding.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(18, 0))
+        onboarding.columnconfigure(0, weight=1)
+        ttk.Label(
+            onboarding,
+            text=(
+                "If the panel cannot join the configured Wi-Fi, it starts its own setup network after 30 seconds. "
+                "Show the QR code, scan it with a phone, then follow the captive portal to choose the home Wi-Fi."
+            ),
+            wraplength=760,
+            justify="left",
+        ).grid(row=0, column=0, sticky="w", padx=(0, 12))
+        ttk.Button(onboarding, text="Show phone setup QR", command=self.show_onboarding_qr).grid(row=0, column=1)
 
     def _build_devices(self) -> None:
         tab = self.devices_tab
@@ -315,24 +334,66 @@ class ProxyPanelApp(tk.Tk):
         bar.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         ttk.Button(bar, text="Search LAN and Home Assistant", command=self.refresh_devices).pack(side="left")
         ttk.Button(bar, text="Open HA integrations", command=self.open_home_assistant).pack(side="left", padx=8)
-        self.device_tree = ttk.Treeview(tab, columns=("name", "ip", "source", "status", "signal"), show="headings", height=13)
-        for column, title, width in (
-            ("name", "Panel", 300), ("ip", "IP address", 140), ("source", "Found through", 130),
-            ("status", "Status", 100), ("signal", "Wi-Fi", 90),
-        ):
-            self.device_tree.heading(column, text=title)
-            self.device_tree.column(column, width=width, anchor="w")
-        self.device_tree.grid(row=1, column=0, sticky="nsew")
+        pane = ttk.Panedwindow(tab, orient="horizontal")
+        pane.grid(row=1, column=0, sticky="nsew")
+        left = ttk.LabelFrame(pane, text="Discovered panels", padding=8)
+        right = ttk.Frame(pane, padding=(12, 0, 0, 0))
+        pane.add(left, weight=1); pane.add(right, weight=3)
+        left.rowconfigure(0, weight=1); left.columnconfigure(0, weight=1)
+        self.device_tree = ttk.Treeview(left, columns=("ip", "status"), show="tree headings", height=18)
+        self.device_tree.heading("#0", text="Panel"); self.device_tree.column("#0", width=180, anchor="w")
+        self.device_tree.heading("ip", text="IP"); self.device_tree.column("ip", width=92, anchor="w")
+        self.device_tree.heading("status", text="Status"); self.device_tree.column("status", width=65, anchor="w")
+        self.device_tree.grid(row=0, column=0, sticky="nsew")
         self.device_tree.bind("<<TreeviewSelect>>", self._device_selected)
-        controls = ttk.LabelFrame(tab, text="Selected paired panel", padding=10)
-        controls.grid(row=2, column=0, sticky="ew", pady=(12, 0))
-        ttk.Label(controls, text="Screen").grid(row=0, column=0, padx=5)
-        ttk.Combobox(controls, textvariable=self.live_mode, values=("Climate", "Temperature", "Humidity", "Proxy Status"), state="readonly", width=18).grid(row=0, column=1, padx=5)
-        ttk.Label(controls, text="Rotation").grid(row=0, column=2, padx=5)
-        ttk.Combobox(controls, textvariable=self.live_rotation, values=("Normal", "Rotated 180"), state="readonly", width=16).grid(row=0, column=3, padx=5)
-        ttk.Button(controls, text="Apply live settings", command=self.apply_live_settings).grid(row=0, column=4, padx=7)
-        ttk.Button(controls, text="Restart", command=self.restart_selected).grid(row=0, column=5, padx=7)
-        ttk.Button(controls, text="Use for LAN update", command=self.use_selected_for_ota).grid(row=0, column=6, padx=7)
+        right.columnconfigure(0, weight=1); right.rowconfigure(3, weight=1)
+        self.selected_panel_title = tk.StringVar(value="Select a panel")
+        ttk.Label(right, textvariable=self.selected_panel_title, font=("Segoe UI", 16, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 8))
+        info = ttk.LabelFrame(right, text="Panel information", padding=10)
+        info.grid(row=1, column=0, sticky="ew"); info.columnconfigure(1, weight=1); info.columnconfigure(3, weight=1)
+        self.device_detail_vars: dict[str, tk.StringVar] = {}
+        detail_fields = (
+            ("IP address", "ip"), ("Node name", "node_name"), ("Connection", "source"), ("Status", "status"),
+            ("Wi-Fi signal", "signal"), ("Uptime", "uptime"), ("Firmware", "firmware_version"),
+            ("Displayed temperature", "display_temperature"), ("Displayed humidity", "display_humidity"),
+        )
+        for index, (label, key) in enumerate(detail_fields):
+            grid_row, pair = divmod(index, 2); column = pair * 2
+            variable = tk.StringVar(value="-"); self.device_detail_vars[key] = variable
+            ttk.Label(info, text=f"{label}:").grid(row=grid_row, column=column, sticky="w", padx=(0, 5), pady=3)
+            ttk.Label(info, textvariable=variable).grid(row=grid_row, column=column + 1, sticky="w", padx=(0, 16), pady=3)
+
+        controls = ttk.LabelFrame(right, text="Live display controls", padding=10)
+        controls.grid(row=2, column=0, sticky="ew", pady=8)
+        ttk.Label(controls, text="Screen").grid(row=0, column=0, padx=4)
+        ttk.Combobox(controls, textvariable=self.live_mode, values=("Climate", "Temperature", "Humidity", "Proxy Status"), state="readonly", width=16).grid(row=0, column=1, padx=4)
+        ttk.Label(controls, text="Rotation").grid(row=0, column=2, padx=4)
+        ttk.Combobox(controls, textvariable=self.live_rotation, values=("Normal", "Rotated 180"), state="readonly", width=14).grid(row=0, column=3, padx=4)
+        ttk.Button(controls, text="Apply", command=self.apply_live_settings).grid(row=0, column=4, padx=5)
+        ttk.Button(controls, text="Restart", command=self.restart_selected).grid(row=0, column=5, padx=5)
+
+        lower = ttk.Panedwindow(right, orient="vertical")
+        lower.grid(row=3, column=0, sticky="nsew")
+        sources = ttk.LabelFrame(lower, text="Climate data sources", padding=10)
+        entities = ttk.LabelFrame(lower, text="Home Assistant entities", padding=8)
+        lower.add(sources, weight=1); lower.add(entities, weight=2)
+        sources.columnconfigure(1, weight=1)
+        self.selected_temp_source = tk.StringVar(); self.selected_hum_source = tk.StringVar()
+        ttk.Label(sources, text="Temperature").grid(row=0, column=0, sticky="w", pady=3)
+        self.selected_temp_box = ttk.Combobox(sources, textvariable=self.selected_temp_source, state="normal")
+        self.selected_temp_box.grid(row=0, column=1, sticky="ew", pady=3)
+        ttk.Label(sources, text="Humidity").grid(row=1, column=0, sticky="w", pady=3)
+        self.selected_hum_box = ttk.Combobox(sources, textvariable=self.selected_hum_source, state="normal")
+        self.selected_hum_box.grid(row=1, column=1, sticky="ew", pady=3)
+        source_actions = ttk.Frame(sources); source_actions.grid(row=2, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        ttk.Button(source_actions, text="Load HA sensors", command=self.load_sensors).pack(side="left")
+        ttk.Button(source_actions, text="Prepare sensor change by OTA", command=self.prepare_sensor_change).pack(side="left", padx=6)
+        ttk.Label(sources, text="Sensor-source changes require an OTA firmware update.", foreground="#555555").grid(row=3, column=0, columnspan=2, sticky="w", pady=(5, 0))
+        entities.rowconfigure(0, weight=1); entities.columnconfigure(0, weight=1)
+        self.entity_tree = ttk.Treeview(entities, columns=("role", "entity", "state"), show="headings", height=6)
+        for column, title, width in (("role", "Role", 125), ("entity", "Entity ID", 285), ("state", "State", 100)):
+            self.entity_tree.heading(column, text=title); self.entity_tree.column(column, width=width, anchor="w")
+        self.entity_tree.grid(row=0, column=0, sticky="nsew")
 
     def _combo(self, parent: ttk.Frame, row: int, label: str, variable: tk.StringVar, attribute: str) -> int:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=5)
@@ -396,6 +457,7 @@ class ProxyPanelApp(tk.Tk):
 
     def _build_about(self) -> None:
         ttk.Label(self.about_tab, text="HA Proxy Panel", font=("Segoe UI", 22, "bold")).pack(anchor="w")
+        ttk.Label(self.about_tab, text=f"Manager version {APP_VERSION}").pack(anchor="w", pady=(2, 0))
         ttk.Label(self.about_tab, text="Bluetooth proxy, climate display, device manager, and secure flasher for Home Assistant.", wraplength=760).pack(anchor="w", pady=(6, 20))
         ttk.Button(self.about_tab, text="Project website", command=lambda: webbrowser.open(PROJECT_PAGE)).pack(anchor="w", pady=4)
         ttk.Button(self.about_tab, text="Source code on GitHub", command=lambda: webbrowser.open(GITHUB_PAGE)).pack(anchor="w", pady=4)
@@ -429,6 +491,47 @@ class ProxyPanelApp(tk.Tk):
 
     def copy_value(self, value: str) -> None:
         self.clipboard_clear(); self.clipboard_append(value); self.status.set("Copied to clipboard")
+
+    @staticmethod
+    def _wifi_qr_payload(ssid: str, password: str) -> str:
+        def escape(value: str) -> str:
+            for character in ("\\", ";", ",", ":"):
+                value = value.replace(character, f"\\{character}")
+            return value
+        return f"WIFI:T:WPA;S:{escape(ssid)};P:{escape(password)};H:false;;"
+
+    @staticmethod
+    def _qr_image(payload: str, maximum_size: int = 290) -> tk.PhotoImage:
+        qr = QrCode.encode_text(payload, QrCode.Ecc.MEDIUM)
+        border = 4; modules = qr.get_size() + border * 2
+        scale = max(3, maximum_size // modules); pixels = modules * scale
+        image = tk.PhotoImage(width=pixels, height=pixels)
+        image.put("white", to=(0, 0, pixels, pixels))
+        for y in range(qr.get_size()):
+            for x in range(qr.get_size()):
+                if qr.get_module(x, y):
+                    left = (x + border) * scale; top = (y + border) * scale
+                    image.put("black", to=(left, top, left + scale, top + scale))
+        return image
+
+    def show_onboarding_qr(self, password: str | None = None) -> None:
+        ssid = "HA Proxy Panel Fallback"; fallback_password = password or self.fallback_password.get()
+        if not fallback_password:
+            messagebox.showerror("Password unavailable", "Generate or load the panel profile first."); return
+        window = tk.Toplevel(self); window.title("Phone setup QR"); window.resizable(False, False)
+        frame = ttk.Frame(window, padding=18); frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="Connect your phone to the panel", font=("Segoe UI", 15, "bold")).pack()
+        ttk.Label(frame, text="Wait about 30 seconds after power-on, then scan this QR code.", wraplength=380).pack(pady=(4, 10))
+        image = self._qr_image(self._wifi_qr_payload(ssid, fallback_password)); window.qr_image = image  # type: ignore[attr-defined]
+        ttk.Label(frame, image=image).pack()
+        ttk.Label(frame, text=f"Network: {ssid}").pack(pady=(8, 2))
+        ttk.Label(frame, text=f"Password: {fallback_password}").pack(pady=2)
+        ttk.Label(frame, text="The phone should open the setup portal automatically. If it does not, open http://192.168.4.1.", wraplength=400, justify="center").pack(pady=8)
+        actions = ttk.Frame(frame); actions.pack(pady=(4, 0))
+        ttk.Button(actions, text="Copy password", command=lambda: self.copy_value(fallback_password)).pack(side="left", padx=4)
+        ttk.Button(actions, text="Open setup portal", command=lambda: webbrowser.open("http://192.168.4.1")).pack(side="left", padx=4)
+        ttk.Button(actions, text="Close", command=window.destroy).pack(side="left", padx=4)
+        window.transient(self); window.grab_set()
 
     def save_settings(self) -> None:
         settings = {
@@ -569,13 +672,13 @@ class ProxyPanelApp(tk.Tk):
                     text = f"{node} {friendly} {project}".casefold()
                     if not any(word in text for word in ("ha-proxy-panel", "proxy panel", "bluetooth proxy")): return
                     addresses = info.parsed_addresses(); ip = addresses[0] if addresses else ""
-                    discovered.append(Panel(f"lan:{node}", friendly, ip, "LAN", "discovered"))
+                    discovered.append(Panel(f"lan:{node}", friendly, ip, "LAN", "discovered", node_name=node))
                 def update_service(self, zc: Zeroconf, service_type: str, name: str) -> None: self.add_service(zc, service_type, name)
                 def remove_service(self, _zc: Zeroconf, _service_type: str, _name: str) -> None: pass
             zc = Zeroconf(); browser = ServiceBrowser(zc, "_esphomelib._tcp.local.", Listener()); time.sleep(4); browser.cancel(); zc.close()
             for panel in discovered:
                 match = next((p for p in panels.values() if p.ip and p.ip == panel.ip), None)
-                if match: match.source = "HA + LAN"
+                if match: match.source = "HA + LAN"; match.node_name = panel.node_name
                 else: panels[panel.key] = panel
         except ImportError: self.log_queue.put("LAN discovery needs the zeroconf package included with ESPHome.\n")
         self.ui_queue.put(("devices", panels))
@@ -587,6 +690,8 @@ class ProxyPanelApp(tk.Tk):
         suffixes = {
             "display_content": "select", "display_rotation": "select", "status": "binary_sensor",
             "ip_address": "sensor", "wi_fi_signal": "sensor", "uptime": "sensor", "restart": "button",
+            "firmware_version": "sensor", "temperature_source": "sensor", "humidity_source": "sensor",
+            "display_temperature": "sensor", "display_humidity": "sensor",
         }
         for item in states:
             entity_id = str(item.get("entity_id", "")); attrs = item.get("attributes") or {}
@@ -613,9 +718,43 @@ class ProxyPanelApp(tk.Tk):
     def _device_selected(self, _event: object = None) -> None:
         panel = self._selected_panel()
         if not panel: return
+        self.selected_panel_title.set(panel.name)
         if panel.ip: self.ota_target.set(panel.ip)
         if panel.values.get("display_content"): self.live_mode.set(panel.values["display_content"])
         if panel.values.get("display_rotation"): self.live_rotation.set(panel.values["display_rotation"])
+        uptime = panel.values.get("uptime", "")
+        try:
+            seconds = float(uptime); uptime = f"{seconds / 86400:.1f} days" if seconds >= 86400 else f"{seconds / 3600:.1f} hours"
+        except ValueError: pass
+        details = {
+            "ip": panel.ip or "Not reported", "node_name": panel.node_name or "Not reported",
+            "source": panel.source, "status": panel.status, "signal": f"{panel.signal} dBm" if panel.signal else "Not reported",
+            "uptime": uptime or "Not reported", "firmware_version": panel.values.get("firmware_version", "Not reported"),
+            "display_temperature": panel.values.get("display_temperature", "Not reported"),
+            "display_humidity": panel.values.get("display_humidity", "Not reported"),
+        }
+        for key, variable in self.device_detail_vars.items(): variable.set(details.get(key, "Not reported"))
+        self.selected_temp_source.set(panel.values.get("temperature_source", ""))
+        self.selected_hum_source.set(panel.values.get("humidity_source", ""))
+        for item in self.entity_tree.get_children(): self.entity_tree.delete(item)
+        for role, entity_id in sorted(panel.entities.items()):
+            self.entity_tree.insert("", "end", values=(role.replace("_", " ").title(), entity_id, panel.values.get(role, "")))
+
+    def prepare_sensor_change(self) -> None:
+        panel = self._selected_panel()
+        if not panel:
+            messagebox.showinfo("Select a panel", "Select the panel whose climate sources you want to change."); return
+        temperature = self.selected_temp_source.get().split(" | ", 1)[0].strip()
+        humidity = self.selected_hum_source.get().split(" | ", 1)[0].strip()
+        if not ENTITY_ID_RE.fullmatch(temperature) or not ENTITY_ID_RE.fullmatch(humidity):
+            messagebox.showerror("Sensor sources required", "Choose or type valid temperature and humidity entity IDs."); return
+        self.temperature_entity.set(temperature); self.humidity_entity.set(humidity)
+        self.friendly_name.set(panel.name)
+        if panel.node_name: self.device_name.set(panel.node_name)
+        if panel.ip: self.ota_target.set(panel.ip)
+        self.display_mode.set(self.live_mode.get()); self.display_rotation.set(self.live_rotation.get())
+        self.notebook.select(self.flash_tab)
+        self.status.set("Sensor changes prepared. Review the profile, then choose Update over LAN.")
 
     def apply_live_settings(self) -> None:
         panel = self._selected_panel()
@@ -657,6 +796,9 @@ class ProxyPanelApp(tk.Tk):
             "wifi_password": self.wifi_password.get(), "api_encryption_key": self.api_key.get(),
             "ota_password": self.ota_password.get(), "fallback_ap_password": self.fallback_password.get(),
         }
+        values["fallback_ap_qr"] = self._wifi_qr_payload(
+            "HA Proxy Panel Fallback", values["fallback_ap_password"]
+        )
         if not DEVICE_NAME_RE.fullmatch(values["device_name"]): raise ValueError("Invalid device name.")
         if not ENTITY_ID_RE.fullmatch(values["temperature_entity"]) or not ENTITY_ID_RE.fullmatch(values["humidity_entity"]): raise ValueError("Choose or type valid Home Assistant entity IDs.")
         if not values["wifi_ssid"] or not values["wifi_password"]: raise ValueError("Wi-Fi SSID and password are required.")
@@ -682,7 +824,7 @@ class ProxyPanelApp(tk.Tk):
             shutil.copy2(base, work / "ha-proxy-panel-base.yaml")
             substitutions = "\n".join(f"  {k}: {yaml_string(values[k])}" for k in ("device_name", "friendly_name", "display_title", "temperature_entity", "humidity_entity", "display_mode_default", "display_rotation_default"))
             (work / "device.yaml").write_text(f"substitutions:\n{substitutions}\n\npackages:\n  panel: !include ha-proxy-panel-base.yaml\n", encoding="utf-8")
-            secrets_path.write_text("\n".join(f"{k}: {yaml_string(values[k])}" for k in ("wifi_ssid", "wifi_password", "api_encryption_key", "ota_password", "fallback_ap_password")) + "\n", encoding="utf-8")
+            secrets_path.write_text("\n".join(f"{k}: {yaml_string(values[k])}" for k in ("wifi_ssid", "wifi_password", "api_encryption_key", "ota_password", "fallback_ap_password", "fallback_ap_qr")) + "\n", encoding="utf-8")
             command = esphome_command() + (["config"] if mode == "config" else ["run"]) + [str(work / "device.yaml")]
             if device: command += ["--device", device]
             self.log_queue.put(f"Using official GitHub firmware commit {sha[:12]}.\n")
@@ -690,6 +832,8 @@ class ProxyPanelApp(tk.Tk):
             assert process.stdout
             for line in process.stdout: self.log_queue.put(self._redact(line, values))
             code = process.wait(); self.ui_queue.put(("message", "ESPHome task completed" if code == 0 else f"ESPHome failed with code {code}"))
+            if code == 0 and mode == "usb":
+                self.ui_queue.put(("onboarding", values["fallback_ap_password"]))
         except Exception as exc: self.ui_queue.put(("error", f"Could not prepare or flash firmware: {exc}"))
         finally:
             try: secrets_path.unlink(missing_ok=True)
@@ -698,7 +842,8 @@ class ProxyPanelApp(tk.Tk):
     def _redact(self, text: str, values: dict[str, str] | None = None) -> str:
         secret_values = (
             (values.get("wifi_password", ""), values.get("api_encryption_key", ""),
-             values.get("ota_password", ""), values.get("fallback_ap_password", ""))
+             values.get("ota_password", ""), values.get("fallback_ap_password", ""),
+             values.get("fallback_ap_qr", ""))
             if values else ()
         )
         for value in secret_values:
@@ -726,6 +871,7 @@ class ProxyPanelApp(tk.Tk):
                 elif kind == "ha_connected":
                     self.ha_status.set("Connected to Home Assistant"); self.status.set("Home Assistant connection successful")
                     if self.remember.get(): self.save_settings()
+                    self.after(400, self.load_sensors); self.after(2000, self.refresh_devices)
                 elif kind == "oauth_token":
                     token = payload if isinstance(payload, dict) else {}
                     self.ha_token.set(str(token.get("access_token", "")))
@@ -741,15 +887,21 @@ class ProxyPanelApp(tk.Tk):
                 elif kind == "sensors":
                     temperature, humidity = payload  # type: ignore[misc]
                     self.temperature_box["values"] = temperature; self.humidity_box["values"] = humidity
+                    self.selected_temp_box["values"] = temperature; self.selected_hum_box["values"] = humidity
                     self.status.set(f"Loaded {len(temperature)} temperature and {len(humidity)} humidity sensors")
                 elif kind == "devices":
                     self.panels = payload if isinstance(payload, dict) else {}
                     for item in self.device_tree.get_children(): self.device_tree.delete(item)
-                    for key, panel in self.panels.items(): self.device_tree.insert("", "end", iid=key, values=(panel.name, panel.ip, panel.source, panel.status, panel.signal))
+                    for key, panel in self.panels.items():
+                        self.device_tree.insert("", "end", iid=key, text=panel.name, values=(panel.ip, panel.status))
+                    if self.panels:
+                        first = next(iter(self.panels)); self.device_tree.selection_set(first); self.device_tree.focus(first); self._device_selected()
                     self.status.set(f"Found {len(self.panels)} HA Proxy Panel device(s)")
                 elif kind == "firmware":
                     _path, sha = payload  # type: ignore[misc]
                     self.firmware_version.set(f"GitHub commit {sha[:12]}"); self.status.set("Official firmware downloaded and verified")
+                elif kind == "onboarding":
+                    self.show_onboarding_qr(str(payload))
         except queue.Empty: pass
         self.after(100, self._drain_queues)
 
