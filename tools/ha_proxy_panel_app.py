@@ -32,11 +32,18 @@ from vendor.qrcodegen import QrCode
 
 
 APP_NAME = "HA Proxy Panel"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 APP_ROOT = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "HAProxyPanel"
 SETTINGS_FILE = APP_ROOT / "settings.json"
 SECURE_FILE = APP_ROOT / "secure.bin"
 GITHUB_REPOSITORY = "WikiZell/ha-proxy-panel"
+FIRMWARE_FILES = (
+    "firmware/ha-proxy-panel.yaml",
+    "firmware/components/panel_portal/__init__.py",
+    "firmware/components/panel_portal/panel_portal.cpp",
+    "firmware/components/panel_portal/panel_portal.h",
+    "firmware/components/panel_portal/portal_index.h",
+)
 GITHUB_PAGE = "https://github.com/WikiZell/ha-proxy-panel"
 PROJECT_PAGE = "https://wikizell.github.io/ha-proxy-panel/"
 KOFI_PAGE = "https://ko-fi.com/wikizell"
@@ -136,18 +143,22 @@ class FirmwareManager:
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def download(self) -> tuple[Path, str]:
+    def download(self, ref: str = "main") -> tuple[Path, str]:
         headers = {"User-Agent": "HA-Proxy-Panel-App", "Accept": "application/vnd.github+json"}
+        encoded_ref = urllib.parse.quote(ref, safe="")
         request = urllib.request.Request(
-            f"https://api.github.com/repos/{GITHUB_REPOSITORY}/commits/main", headers=headers
+            f"https://api.github.com/repos/{GITHUB_REPOSITORY}/commits/{encoded_ref}", headers=headers
         )
         with urllib.request.urlopen(request, timeout=15) as response:
             commit = json.load(response)
         sha = str(commit["sha"])
-        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPOSITORY}/{sha}/firmware/ha-proxy-panel.yaml"
-        request = urllib.request.Request(raw_url, headers={"User-Agent": "HA-Proxy-Panel-App"})
-        with urllib.request.urlopen(request, timeout=20) as response:
-            firmware = response.read()
+        downloaded: dict[str, bytes] = {}
+        for source_path in FIRMWARE_FILES:
+            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPOSITORY}/{sha}/{source_path}"
+            request = urllib.request.Request(raw_url, headers={"User-Agent": "HA-Proxy-Panel-App"})
+            with urllib.request.urlopen(request, timeout=20) as response:
+                downloaded[source_path] = response.read()
+        firmware = downloaded["firmware/ha-proxy-panel.yaml"]
         text = firmware.decode("utf-8")
         for marker in ("substitutions:", "bluetooth_proxy:", "display:", "api:"):
             if marker not in text:
@@ -155,13 +166,22 @@ class FirmwareManager:
         destination = self.root / sha
         destination.mkdir(parents=True, exist_ok=True)
         path = destination / "ha-proxy-panel.yaml"
-        path.write_bytes(firmware)
+        for source_path, content in downloaded.items():
+            relative = Path(source_path).relative_to("firmware")
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content)
         (destination / "metadata.json").write_text(
             json.dumps(
                 {
                     "repository": GITHUB_REPOSITORY,
+                    "requested_ref": ref,
                     "commit": sha,
                     "sha256": hashlib.sha256(firmware).hexdigest(),
+                    "files": {
+                        source_path: hashlib.sha256(content).hexdigest()
+                        for source_path, content in downloaded.items()
+                    },
                     "downloaded_at": int(time.time()),
                 },
                 indent=2,
@@ -1171,6 +1191,7 @@ class ProxyPanelApp(tk.Tk):
             base, sha = self.firmware_manager.download()
             self.ui_queue.put(("firmware", (base, sha)))
             shutil.copy2(base, work / "ha-proxy-panel-base.yaml")
+            shutil.copytree(base.parent / "components", work / "components", dirs_exist_ok=True)
             substitutions = "\n".join(f"  {k}: {yaml_string(values[k])}" for k in ("device_name", "friendly_name", "display_title", "temperature_entity", "humidity_entity", "display_mode_default", "display_rotation_default"))
             (work / "device.yaml").write_text(f"substitutions:\n{substitutions}\n\npackages:\n  panel: !include ha-proxy-panel-base.yaml\n", encoding="utf-8")
             secrets_path.write_text("\n".join(f"{k}: {yaml_string(values[k])}" for k in ("wifi_ssid", "wifi_password", "api_encryption_key", "ota_password", "fallback_ap_password", "fallback_ap_qr")) + "\n", encoding="utf-8")
