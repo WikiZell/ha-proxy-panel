@@ -2,6 +2,7 @@
 """Launch the HA Proxy Panel desktop app or its bundled ESPHome runtime."""
 
 import runpy
+import os
 import sys
 from pathlib import Path
 
@@ -13,6 +14,9 @@ def run_bundled_python_script() -> bool:
     script = Path(sys.argv[1])
     if script.suffix.casefold() != ".py" or not script.is_file():
         return False
+    for directory in reversed(os.environ.get("PYTHONPATH", "").split(os.pathsep)):
+        if directory and directory not in sys.path:
+            sys.path.insert(0, directory)
     sys.argv = sys.argv[1:]
     runpy.run_path(str(script), run_name="__main__")
     return True
