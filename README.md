@@ -2,7 +2,7 @@
 
 HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assistant Bluetooth proxy with a local climate and status display.
 
-[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Download Manager 1.6.0](https://github.com/WikiZell/ha-proxy-panel/releases/download/v1.6.0/HA-Proxy-Panel-Manager.exe) | [Project Wiki](https://github.com/WikiZell/ha-proxy-panel/wiki) | [Support WikiZell on Ko-fi](https://ko-fi.com/wikizell)
+[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Read the WikiZell article](https://wikizell.com/esp32-bluetooth-proxy-home-assistant-oled/) | [Download Manager 1.6.0](https://github.com/WikiZell/ha-proxy-panel/releases/download/v1.6.0/HA-Proxy-Panel-Manager.exe) | [Project Wiki](https://github.com/WikiZell/ha-proxy-panel/wiki) | [Support WikiZell on Ko-fi](https://ko-fi.com/wikizell)
 
 ![HA Proxy Panel hardware render](docs/assets/hero-device.png)
 
@@ -238,6 +238,7 @@ You can also use **Install > Wirelessly** in ESPHome Device Builder.
 
 The [HA Proxy Panel Wiki](https://github.com/WikiZell/ha-proxy-panel/wiki) provides short, task-focused guides:
 
+- [Project article: ESP32 Bluetooth Proxy for Home Assistant with OLED](https://wikizell.com/esp32-bluetooth-proxy-home-assistant-oled/)
 - [Windows Manager](https://github.com/WikiZell/ha-proxy-panel/wiki/Windows-Manager)
 - [First-Time Setup](https://github.com/WikiZell/ha-proxy-panel/wiki/First-Time-Setup)
 - [Updating an Existing Panel](https://github.com/WikiZell/ha-proxy-panel/wiki/Updating-an-Existing-Panel)
