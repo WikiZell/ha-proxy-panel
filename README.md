@@ -2,7 +2,7 @@
 
 HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assistant Bluetooth proxy with a local climate and status display.
 
-[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Installation guide](https://wikizell.github.io/ha-proxy-panel/#install) | [Support WikiZell on Ko-fi](https://ko-fi.com/wikizell)
+[Open the project website](https://wikizell.github.io/ha-proxy-panel/) | [Download Manager 1.6.0](https://github.com/WikiZell/ha-proxy-panel/releases/download/v1.6.0/HA-Proxy-Panel-Manager.exe) | [Project Wiki](https://github.com/WikiZell/ha-proxy-panel/wiki) | [Support WikiZell on Ko-fi](https://ko-fi.com/wikizell)
 
 ![HA Proxy Panel hardware render](docs/assets/hero-device.png)
 
@@ -18,6 +18,9 @@ HA Proxy Panel turns an ESP32 and a small 128x64 OLED into a useful Home Assista
 - Safe encrypted Home Assistant API and password-protected OTA updates
 - Captive-portal fallback with an on-screen Wi-Fi QR when normal Wi-Fi is unavailable
 - Automatic ESPHome discovery and an **Add to Home Assistant** handoff after Wi-Fi setup
+- Brightness control, a reserved scrolling title row, and OLED Care with pixel shifting and full-screen refresh animations
+- Combined panel and ESPHome update notifications with a blinking indicator and a bottom-up status tray
+- Protected Device Builder adoption, diagnostics, OTA updates, and restart controls
 
 ## Supported hardware
 
@@ -63,7 +66,7 @@ SCL  ----------------------  GPIO22
 
 Download the standalone Windows manager. It includes ESPHome, so Python is not required:
 
-[Download HA Proxy Panel Manager for Windows](https://github.com/WikiZell/ha-proxy-panel/releases/latest/download/HA-Proxy-Panel-Manager.exe)
+[Download HA Proxy Panel Manager for Windows 1.6.0](https://github.com/WikiZell/ha-proxy-panel/releases/download/v1.6.0/HA-Proxy-Panel-Manager.exe)
 
 Windows may show a SmartScreen warning because this community executable is not code-signed. Verify the SHA256 value published with the GitHub release before running it.
 
@@ -74,14 +77,16 @@ python -m pip install -r tools/requirements-windows.txt
 python tools/ha_proxy_panel_flasher.py
 ```
 
-The responsive manager uses a clear overview, a selected-device dashboard, a guided configuration and installation workspace, logs, and project information.
+Version 1.6.0 bundles ESPHome 2026.7.4. The responsive manager separates flashing from panel management and uses a clear overview, a fixed-size selected-device dashboard, a guided configuration and installation workspace, logs, and project information.
 
 - Sign in through Home Assistant's own browser login page, including MFA when enabled.
+- Use a manual long-lived token when browser login is not available.
 - Store the resulting Home Assistant token and device secrets with Windows DPAPI encryption.
 - Detect the connected Windows Wi-Fi network and saved WLAN profiles, then prefill an available saved password without displaying it.
 - Explain whether Wi-Fi came from encrypted app storage, the connected Windows profile, a selected saved profile, or manual entry.
 - Show Home Assistant, Wi-Fi, USB, panel-discovery, sensor, and installation-readiness status at a glance.
 - Discover HA Proxy Panels through Home Assistant and ESPHome mDNS on the LAN.
+- Search for every HA Proxy Panel on the LAN and connect directly by IP when Windows or the network blocks mDNS.
 - Show a selected panel dashboard with IP address, node name, status, Wi-Fi signal, uptime, firmware, API security, Home Assistant update status, displayed values, climate sources, and Home Assistant entities.
 - Update the selected panel directly from the Devices page using the latest verified GitHub firmware while preserving its identity, sensors, rotation, and existing connection security.
 - Change display content, rotation, brightness, and OLED Care immediately on paired panels.
@@ -93,9 +98,14 @@ The responsive manager uses a clear overview, a selected-device dashboard, a gui
 - Download and verify an exact official GitHub firmware commit before every flash or update.
 - Detect a newly provisioned panel and submit its saved API encryption key through Home Assistant's supported config flow.
 - Create or update the selected panel's protected ESPHome Device Builder YAML through Home Assistant ingress, using per-panel secret names.
+- Refuse to overwrite an unmanaged Device Builder YAML project.
 - Remove the temporary plaintext `secrets.yaml` after ESPHome finishes.
 - Provide right-click Cut, Copy, Paste, and Select All actions on input fields.
 - Generate an offline phone QR code for the panel fallback Wi-Fi and captive portal.
+- Keep operational logs useful while redacting passwords, tokens, encryption keys, and other secrets.
+- Open the project website, GitHub repository, Wiki, and Ko-fi support page from the app.
+
+The selected-device page reports the panel IP, node name, connection source, project firmware, ESPHome version, Home Assistant firmware update status, API security mode, rotation, brightness, OLED Care state, sensor sources, entities, and diagnostics. Display mode, rotation, brightness, OLED Care, its manual animation, and restart controls apply live. Sensor source changes and official firmware updates use a reviewed OTA workflow that preserves the device and entity identity, encrypted or legacy API mode, Wi-Fi and OTA settings, sensor sources, and display preferences.
 
 The app never asks for or stores your Home Assistant username, password, or MFA code. Those are entered only on the Home Assistant login page. A manual long-lived access token remains available as a fallback. If Home Assistant is unavailable, temperature and humidity entity IDs can be typed directly. A panel does not expose its saved Wi-Fi password. The manager can only reuse its own encrypted setting or a Windows WLAN profile selected by the current user.
 
@@ -223,6 +233,17 @@ esphome run firmware/ha-proxy-panel.yaml --device ha-proxy-panel.local
 ```
 
 You can also use **Install > Wirelessly** in ESPHome Device Builder.
+
+## Guides and Wiki
+
+The [HA Proxy Panel Wiki](https://github.com/WikiZell/ha-proxy-panel/wiki) provides short, task-focused guides:
+
+- [Windows Manager](https://github.com/WikiZell/ha-proxy-panel/wiki/Windows-Manager)
+- [First-Time Setup](https://github.com/WikiZell/ha-proxy-panel/wiki/First-Time-Setup)
+- [Updating an Existing Panel](https://github.com/WikiZell/ha-proxy-panel/wiki/Updating-an-Existing-Panel)
+- [Device and Firmware](https://github.com/WikiZell/ha-proxy-panel/wiki/Device-and-Firmware)
+- [Home Assistant and Device Builder](https://github.com/WikiZell/ha-proxy-panel/wiki/Home-Assistant-and-Device-Builder)
+- [Troubleshooting](https://github.com/WikiZell/ha-proxy-panel/wiki/Troubleshooting)
 
 ## Configuration reference
 

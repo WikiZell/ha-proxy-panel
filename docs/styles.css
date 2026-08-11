@@ -222,6 +222,23 @@ select {
   line-height: 1.55;
 }
 
+.hero-copy > .release-chip {
+  display: inline-flex;
+  width: fit-content;
+  margin: 2px 0 22px;
+  padding: 7px 11px;
+  border: 1px solid rgba(52, 196, 234, 0.3);
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(52, 196, 234, 0.07);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .hero-actions {
   display: flex;
   align-items: center;
@@ -420,6 +437,106 @@ select:focus-visible,
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.5;
+}
+
+.manager {
+  display: grid;
+  gap: 42px;
+}
+
+.manager .section-heading {
+  margin-bottom: 0;
+}
+
+.manager-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 28px;
+  border: 1px solid rgba(52, 196, 234, 0.24);
+  border-radius: 12px;
+  background: linear-gradient(120deg, rgba(52, 196, 234, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.manager-actions p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.manager-actions p a {
+  color: var(--accent);
+}
+
+.manager-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--line);
+}
+
+.manager-card {
+  min-height: 200px;
+  padding: 28px;
+  background: var(--surface);
+}
+
+.manager-card > span {
+  color: var(--accent);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.manager-card h3 {
+  margin: 42px 0 10px;
+  font-size: 1.08rem;
+}
+
+.manager-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.manager-flow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manager-flow li {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  padding: 0 40px 0 0;
+}
+
+.manager-flow li:not(:last-child)::after {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 28px;
+  height: 1px;
+  background: var(--accent);
+  content: "";
+}
+
+.manager-flow strong {
+  font-size: 0.92rem;
+}
+
+.manager-flow span {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .hardware,
@@ -877,6 +994,14 @@ pre code {
   max-width: 720px;
 }
 
+.docs-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
 .button-outline {
   flex: 0 0 auto;
   border-color: var(--accent);
@@ -955,6 +1080,10 @@ pre code {
 
   .configuration {
     gap: 60px;
+  }
+
+  .manager-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1050,6 +1179,20 @@ pre code {
     grid-template-columns: 1fr;
   }
 
+  .manager-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .manager-flow {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .manager-flow li:not(:last-child)::after {
+    display: none;
+  }
+
   .docs-cta {
     align-items: flex-start;
     flex-direction: column;
@@ -1110,6 +1253,18 @@ pre code {
   .feature-list {
     grid-template-columns: 1fr 1fr;
     gap: 38px 0;
+  }
+
+  .manager-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-card {
+    min-height: 0;
+  }
+
+  .manager-card h3 {
+    margin-top: 20px;
   }
 
   .feature {
